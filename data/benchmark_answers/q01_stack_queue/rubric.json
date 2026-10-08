@@ -1,0 +1,26 @@
+[
+  {
+    "criterion_name": "technical_correctness",
+    "criterion_type": "correctness",
+    "weight": 0.5,
+    "expected_concepts": ["LIFO", "FIFO", "push", "pop", "enqueue", "dequeue"],
+    "star_component": false,
+    "scoring_guide": "1.0 if LIFO and FIFO defined, operations named. 0.5 if one defined. 0.0 if incorrect."
+  },
+  {
+    "criterion_name": "concept_coverage",
+    "criterion_type": "concept_coverage",
+    "weight": 0.3,
+    "expected_concepts": ["use cases", "time complexity"],
+    "star_component": false,
+    "scoring_guide": "1.0 if both use cases and complexity mentioned. 0.5 if one only."
+  },
+  {
+    "criterion_name": "completeness",
+    "criterion_type": "completeness",
+    "weight": 0.2,
+    "expected_concepts": ["example"],
+    "star_component": false,
+    "scoring_guide": "1.0 if real-world example given."
+  }
+]

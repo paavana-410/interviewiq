@@ -1,0 +1,26 @@
+[
+  {
+    "criterion_name": "technical_correctness",
+    "criterion_type": "correctness",
+    "weight": 0.5,
+    "expected_concepts": ["stateless", "client-server", "uniform interface", "cacheable", "layered system", "code on demand"],
+    "star_component": false,
+    "scoring_guide": "1.0 if 4+ constraints named correctly."
+  },
+  {
+    "criterion_name": "relevance",
+    "criterion_type": "relevance",
+    "weight": 0.3,
+    "expected_concepts": ["HTTP methods", "resources", "JSON"],
+    "star_component": false,
+    "scoring_guide": "1.0 if practical REST usage explained."
+  },
+  {
+    "criterion_name": "completeness",
+    "criterion_type": "completeness",
+    "weight": 0.2,
+    "expected_concepts": ["example endpoint"],
+    "star_component": false,
+    "scoring_guide": "1.0 if example given."
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "criterion_name": "star_action",
+    "criterion_type": "star_structure",
+    "weight": 0.5,
+    "expected_concepts": ["delegating", "motivating", "planning", "decision-making"],
+    "star_component": true,
+    "scoring_guide": "1.0 if explicit leadership behaviours described."
+  },
+  {
+    "criterion_name": "star_result",
+    "criterion_type": "star_structure",
+    "weight": 0.3,
+    "expected_concepts": ["team success", "measurable outcome"],
+    "star_component": true,
+    "scoring_guide": "1.0 if measurable positive result."
+  },
+  {
+    "criterion_name": "concept_coverage",
+    "criterion_type": "concept_coverage",
+    "weight": 0.2,
+    "expected_concepts": ["initiative", "accountability"],
+    "star_component": false,
+    "scoring_guide": "Score by concept coverage."
+  }
+]
