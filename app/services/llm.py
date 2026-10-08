@@ -169,26 +169,35 @@ class _DiskCache:
 class OpenAICompatibleService(LLMService):
     """Single implementation for any OpenAI-compatible API endpoint.
 
-    Anthropic is accessed via its OpenAI-compatible endpoint.
-    Local models (Ollama, LM Studio) work the same way.
+    Uses httpx directly instead of the OpenAI SDK to avoid hanging issues
+    with certain providers. Supports all providers: OpenAI, Gemini (AQ. keys),
+    OpenRouter, Ollama, Anthropic-compat, etc.
     """
 
     def __init__(self, config: JudgeConfig, cache_dir: str | Path | None = None):
-        import openai  # type: ignore
-
         self._config = config
         self._model = config.model
         self._provider = config.provider
-
-        # Build client — key value goes directly to SDK, never logged
-        self._client = openai.OpenAI(
-            api_key=config.api_key,
-            base_url=config.base_url or None,
-        )
-
+        self._base_url = (config.base_url or "").rstrip("/")
+        self._api_key = config.api_key
         self._bucket = _TokenBucket(config.rpm)
         self._cache = _DiskCache(cache_dir) if cache_dir else None
         self._secrets = [config.api_key]
+
+        # Gemini AQ. keys need x-goog-api-key + Authorization: Bearer
+        self._is_gemini_aq = (
+            config.api_key.startswith("AQ.")
+            and "googleapis.com" in self._base_url
+        )
+
+    def _build_headers(self) -> dict:
+        h = {"Content-Type": "application/json"}
+        if self._is_gemini_aq:
+            h["Authorization"] = f"Bearer {self._api_key}"
+            h["x-goog-api-key"] = self._api_key
+        else:
+            h["Authorization"] = f"Bearer {self._api_key}"
+        return h
 
     @property
     def model_name(self) -> str:
@@ -206,16 +215,14 @@ class OpenAICompatibleService(LLMService):
         max_tokens: int = 2048,
         prompt_version: str = "v1",
     ) -> LLMResponse:
-        # Cache lookup (only for temperature=0 deterministic calls)
         if self._cache and temperature == 0.0:
             cached = self._cache.get(self._model, prompt_version, prompt)
             if cached is not None:
-                logger.debug("Cache hit for model=%s prompt_version=%s", self._model, prompt_version)
+                logger.debug("Cache hit model=%s", self._model)
                 return cached
 
         resp = self._complete_with_retry(prompt, temperature=temperature, max_tokens=max_tokens)
 
-        # Cache store
         if self._cache and temperature == 0.0:
             self._cache.put(self._model, prompt_version, prompt, resp)
 
@@ -230,30 +237,72 @@ class OpenAICompatibleService(LLMService):
     def _complete_with_retry(
         self, prompt: str, *, temperature: float, max_tokens: int
     ) -> LLMResponse:
+        import httpx as _httpx
+
         self._bucket.acquire()
+        url = self._base_url + "/chat/completions"
+        body = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
         t0 = time.monotonic()
         try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-        except Exception as exc:
-            # Mask any key values that might appear in the error message
-            safe_msg = mask_secrets_in_text(str(exc), self._secrets)
-            logger.warning("LLM call failed (model=%s): %s", self._model, safe_msg)
-            raise
+            with _httpx.Client(timeout=30.0) as client:
+                r = client.post(url, headers=self._build_headers(), json=body)
+        except _httpx.TimeoutException:
+            raise TimeoutError(f"Request to {self._model} timed out after 30s")
+        except _httpx.ConnectError as e:
+            raise ConnectionError(f"Cannot connect to {self._base_url}: {e}")
 
         latency = int((time.monotonic() - t0) * 1000)
-        choice = response.choices[0]
-        text = choice.message.content or ""
 
+        # Non-retryable errors
+        if r.status_code in (400, 401, 403, 404):
+            try:
+                data = r.json()
+                err = data.get("error", {})
+                if isinstance(err, list):
+                    err = err[0].get("error", {}) if err else {}
+                msg = err.get("message", r.text[:200])
+            except Exception:
+                msg = r.text[:200]
+            safe = mask_secrets_in_text(msg, self._secrets)
+            exc_map = {
+                400: ValueError(f"Bad request (400): {safe}"),
+                401: PermissionError(f"Auth failed (401): {safe}"),
+                403: PermissionError(f"Forbidden (403): {safe}"),
+                404: LookupError(f"Model not found (404): {self._model}"),
+            }
+            raise exc_map[r.status_code]
+
+        # Retryable errors
+        if r.status_code in (429, 502, 503, 504):
+            try:
+                msg = r.json().get("error", {}).get("message", "")
+            except Exception:
+                msg = ""
+            safe = mask_secrets_in_text(msg, self._secrets)
+            logger.warning("Retryable error %s model=%s: %s", r.status_code, self._model, safe[:100])
+            raise IOError(f"HTTP {r.status_code}: {safe[:100]}")
+
+        if r.status_code != 200:
+            raise IOError(f"Unexpected HTTP {r.status_code}: {r.text[:100]}")
+
+        data = r.json()
+        try:
+            text = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError):
+            raise ValueError(f"Unexpected response shape: {str(data)[:200]}")
+
+        usage = data.get("usage", {})
         return LLMResponse(
             text=text,
             model_name=self._model,
-            input_tokens=response.usage.prompt_tokens if response.usage else None,
-            output_tokens=response.usage.completion_tokens if response.usage else None,
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens"),
             latency_ms=latency,
         )
 
