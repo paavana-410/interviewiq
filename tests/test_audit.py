@@ -63,7 +63,7 @@ def test_delivery_invariance_detects_contamination(rubric, variant_generator, sa
     call_count = {"n": 0}
 
     class FluctuatingMockLLM(MockLLMService):
-        def complete(self, prompt, *, temperature=0.0, max_tokens=2048):
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048, **kwargs):
             call_count["n"] += 1
             score = 0.9 if call_count["n"] == 1 else 0.1  # huge delta
             resp_json = {
@@ -121,7 +121,7 @@ def test_repeated_run_high_variance_fails(rubric):
     rng = random.Random(99)
 
     class NoisyMockLLM(MockLLMService):
-        def complete(self, prompt, *, temperature=0.0, max_tokens=2048):
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048, **kwargs):
             score = rng.uniform(0.0, 1.0)
             resp_json = {
                 "criteria": [{"criterion_name": "c", "score": score,
@@ -189,7 +189,7 @@ def test_combiner_flags_uncertainty_on_failure(rubric, variant_generator, sample
     call_count = {"n": 0}
 
     class FluctuatingMockLLM(MockLLMService):
-        def complete(self, prompt, *, temperature=0.0, max_tokens=2048):
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048, **kwargs):
             call_count["n"] += 1
             score = 0.9 if call_count["n"] == 1 else 0.2
             resp_json = {

@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,12 +18,11 @@ class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────────
     database_url: str = "postgresql://interviewiq:interviewiq@localhost:5432/interviewiq"
 
-    # ── LLM ───────────────────────────────────────────────────────────────────
-    llm_provider: Literal["openai", "anthropic", "mock"] = "mock"
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-3-5-sonnet-20241022"
+    # ── LLM mode ─────────────────────────────────────────────────────────────
+    # Set to "mock" to disable all real LLM calls (tests / CI).
+    # In production leave unset or set to anything else; the judge registry
+    # (JUDGE_1_*, JUDGE_2_*, ...) drives which models are used.
+    llm_provider: str = "mock"
 
     # ── Prompt versions ───────────────────────────────────────────────────────
     content_engine_prompt_version: str = "v1"
@@ -35,7 +33,7 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
 
-    # ── Delivery Engine ───────────────────────────────────────────────────────
+    # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5
     filler_words: str = "um,uh,like,you know,so,basically,actually,literally"
 

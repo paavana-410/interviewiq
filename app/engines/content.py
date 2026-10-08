@@ -248,7 +248,7 @@ class ContentEngine:
             delivery_features=effective_delivery,
         )
 
-        llm_response, parsed, log_id = self._call_with_retry(prompt)
+        llm_response, parsed, log_id = self._call_with_retry(prompt, prompt_version=settings.content_engine_prompt_version)
 
         return self._build_result(parsed, used_delivery=(effective_delivery is not None), log_id=log_id)
 
@@ -257,9 +257,14 @@ class ContentEngine:
         wait=wait_exponential(multiplier=1, min=1, max=8),
         reraise=True,
     )
-    def _call_with_retry(self, prompt: str) -> tuple[Any, ContentEvalOutput, int | None]:
+    def _call_with_retry(self, prompt: str, prompt_version: str = "v1") -> tuple[Any, ContentEvalOutput, int | None]:
         """Call LLM, validate JSON, retry on parse failure."""
-        llm_resp = self._llm.complete(prompt, temperature=0.0, max_tokens=2048)
+        llm_resp = self._llm.complete(
+            prompt,
+            temperature=0.0,
+            max_tokens=2048,
+            prompt_version=prompt_version,
+        )
         raw = llm_resp.text
 
         # Extract JSON block (handle markdown code fences)

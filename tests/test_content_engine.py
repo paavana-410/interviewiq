@@ -25,7 +25,7 @@ def test_content_engine_retries_on_bad_json(rubric_criteria):
     call_count = {"n": 0}
 
     class BrokenThenFixedLLM(MockLLMService):
-        def complete(self, prompt, *, temperature=0.0, max_tokens=2048):
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048, **kwargs):
             call_count["n"] += 1
             if call_count["n"] < 2:
                 return LLMResponse(text="not json at all {{broken", model_name="broken")

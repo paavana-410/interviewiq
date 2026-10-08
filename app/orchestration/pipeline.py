@@ -106,7 +106,7 @@ def run_evaluation_pipeline(response_id: int, db: Session) -> None:
     db.flush()
 
     # ── 3. Content Engine (transcript TEXT only — no timestamps) ──────────────
-    llm = get_llm_service()
+    llm = get_llm_service()  # first configured judge, or mock
     content_engine = ContentEngine(llm=llm, db=db)
 
     # Ablation: optionally pass delivery features
