@@ -2,38 +2,35 @@
 """run_audit_benchmark.py — Research benchmark CLI for InterviewIQ.
 
 Usage:
-    # Run all configured judges (default)
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers
+    # Run all configured judges (default), tagged as pilot
+    python run_audit_benchmark.py --answers-dir data/benchmark_answers --tag pilot
 
-    # Run specific judges by name
+    # Run specific judges
     python run_audit_benchmark.py --answers-dir data/benchmark_answers \\
-        --judges judge_gpt4o,judge_claude
+        --judges judge_nemotron,judge_gemini --tag pilot
 
-    # Legacy --models flag still works for mock / CI
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers \\
-        --judges mock --runs 3
+    # Final run (fails if working tree is dirty)
+    python run_audit_benchmark.py --answers-dir data/benchmark_answers --tag final
 
-Input folder layout (one sub-folder per answer item):
-    data/benchmark_answers/
-        q01_stack_queue/
-            answer.txt          # plain text answer
-            question.txt        # interview question
-            rubric.json         # list of rubric criteria
-            gold_transcript.txt # (optional) gold transcript for STT test
-            audio.wav           # (optional) audio for STT test
+Tags: mock | pilot | final
+  - mock:  no real API calls; never cite in paper
+  - pilot: real calls, small/exploratory dataset; may cite as preliminary
+  - final: working tree must be clean; frozen prompts/thresholds required
 
-Outputs (per run):
-    experiments/<run_id>/
-        config.json      — full config snapshot (judge provider + model, no keys)
-        results.csv      — per-answer per-test per-judge metrics
-        summary.json     — aggregated stats
-        *.png            — plots
+Outputs per run in experiments/<run_id>/:
+    config.json      — config snapshot (git hash, pip freeze, judge models, NO keys)
+    results.csv      — per-answer per-test per-judge metrics
+    summary.json     — aggregated stats
+    *.png            — plots
+
+Also appends one line to docs/experiments.md.
 """
 from __future__ import annotations
 
 import csv
 import json
 import os
+import subprocess
 import sys
 import uuid
 from dataclasses import asdict, dataclass
@@ -48,6 +45,97 @@ import click
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Research record-keeping helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _git_hash() -> str:
+    """Return current HEAD commit hash, or 'unknown'."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def _git_dirty() -> bool:
+    """Return True if working tree has uncommitted changes."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, check=True
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return False
+
+
+def _pip_freeze() -> list[str]:
+    """Return pip freeze output as a list of lines."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "freeze"],
+            capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip().splitlines()
+    except Exception:
+        return []
+
+
+def _append_to_experiments_log(
+    run_id: str,
+    tag: str,
+    judge_names: list[str],
+    n_items: int,
+    prompt_version: str,
+    git_hash: str,
+    summary: dict,
+) -> None:
+    """Append one row to docs/experiments.md."""
+    log_path = Path("docs/experiments.md")
+    if not log_path.exists():
+        return
+
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    def _pct(test: str) -> str:
+        t = summary.get("per_test", {}).get(test, {})
+        if not t:
+            return "—"
+        return f"{t.get('pass_rate', 0)*100:.0f}%"
+
+    overall = summary.get("overall_pass_rate", "—")
+    if isinstance(overall, float):
+        overall = f"{overall*100:.0f}%"
+
+    # Compute overall pass rate across all tests
+    tests = summary.get("per_test", {})
+    if tests:
+        rates = [v.get("pass_rate", 0) for v in tests.values()]
+        overall = f"{sum(rates)/len(rates)*100:.0f}%"
+
+    judges_str = "/".join(judge_names)
+    row = (
+        f"| {run_id} | {date_str} | **{tag}** | {judges_str} | {n_items} "
+        f"| v{prompt_version} | `{git_hash[:8]}` "
+        f"| {_pct('delivery_invariance')} | {_pct('content_sensitivity')} "
+        f"| {_pct('paraphrase_stability')} | {_pct('repeated_run')} "
+        f"| {overall} | |"
+    )
+
+    content = log_path.read_text(encoding="utf-8")
+    marker = "<!-- EXPERIMENT_LOG_END"
+    if marker in content:
+        content = content.replace(marker, row + "\n" + marker)
+        log_path.write_text(content, encoding="utf-8")
+    else:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write("\n" + row + "\n")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -489,15 +577,17 @@ def write_outputs(
 )
 @click.option(
     "--judges", default="all", show_default=True,
-    help=(
-        "'all' = every configured judge, "
-        "'mock' = no-key test mode, "
-        "or comma-separated judge names e.g. 'judge_gpt4o,judge_claude'"
-    ),
+    help="'all', 'mock', or comma-separated judge names",
 )
 @click.option("--runs", default=5, show_default=True, help="Repeated runs for consistency test")
 @click.option("--output-dir", default="experiments", show_default=True)
 @click.option("--seed", default=42, show_default=True)
+@click.option(
+    "--tag", default="pilot",
+    type=click.Choice(["mock", "pilot", "final"], case_sensitive=False),
+    show_default=True,
+    help="mock=no real calls, pilot=real/exploratory, final=clean tree required",
+)
 @click.option("--delivery-invariance-max", default=None, type=float)
 @click.option("--content-sensitivity-min", default=None, type=float)
 @click.option("--paraphrase-max-deviation", default=None, type=float)
@@ -507,6 +597,7 @@ def main(
     runs: int,
     output_dir: str,
     seed: int,
+    tag: str,
     delivery_invariance_max: float | None,
     content_sensitivity_min: float | None,
     paraphrase_max_deviation: float | None,
@@ -516,12 +607,31 @@ def main(
     from app.services.judge_config import get_judge_registry, mask_secrets_in_text
 
     settings = get_settings()
+
+    # ── Dirty-tree guard for final runs ───────────────────────────────────────
+    if tag == "final" and _git_dirty():
+        click.secho(
+            "\nERROR: Working tree has uncommitted changes.\n"
+            "Final runs require a clean git working tree.\n"
+            "Commit or stash your changes, then retry.\n"
+            "  git status  →  see what's uncommitted\n"
+            "  git add . && git commit -m 'pre-final-run state'",
+            fg="red", bold=True,
+        )
+        raise SystemExit(1)
+
+    if tag == "mock":
+        import os as _os
+        _os.environ["LLM_PROVIDER"] = "mock"
     run_id = (
         f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+        f"_{tag}"
         f"_{uuid.uuid4().hex[:8]}"
     )
 
-    click.echo(f"\nInterviewIQ Audit Benchmark  run_id={run_id}")
+    click.echo(f"\nInterviewIQ Audit Benchmark")
+    click.echo(f"  run_id      : {run_id}")
+    click.echo(f"  tag         : {tag}")
     click.echo(f"  answers_dir : {answers_dir}")
     click.echo(f"  judges flag : {judges}")
     click.echo(f"  runs        : {runs}")
@@ -562,9 +672,15 @@ def main(
                        for n, svc in judge_services]
         paraphrase_safe = None
 
+    # Collect git hash and pip freeze for reproducibility
+    git_hash = _git_hash()
+    pip_packages = _pip_freeze()
+
     config_snapshot = {
         "run_id": run_id,
+        "tag": tag,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "git_commit": git_hash,
         "answers_dir": str(answers_path.resolve()),
         "judges": judges_safe,
         "paraphrase": paraphrase_safe,
@@ -580,6 +696,8 @@ def main(
             "audit_stt_max_drift": settings.audit_stt_max_drift,
             "content_engine_prompt_version": settings.content_engine_prompt_version,
         },
+        "pip_freeze": pip_packages,
+        # Keys are never included — only names and masked values
     }
 
     # Run benchmark
@@ -606,6 +724,25 @@ def main(
 
     out_dir = Path(output_dir) / run_id
     write_outputs(all_rows, out_dir, config_snapshot)
+
+    # ── Append to docs/experiments.md ─────────────────────────────────────────
+    import pandas as pd
+    df_summary = pd.DataFrame([asdict(r) for r in all_rows])
+    summary_for_log: dict = {"per_test": {}}
+    for test_name, grp in df_summary.groupby("test_name"):
+        summary_for_log["per_test"][test_name] = {
+            "pass_rate": float(grp["passed"].mean()),
+        }
+    _append_to_experiments_log(
+        run_id=run_id,
+        tag=tag,
+        judge_names=[n for n, _ in judge_services],
+        n_items=len(items),
+        prompt_version=settings.content_engine_prompt_version,
+        git_hash=git_hash,
+        summary=summary_for_log,
+    )
+    click.echo(f"  ✓ Logged to : docs/experiments.md")
 
     # Summary table
     import pandas as pd
