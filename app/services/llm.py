@@ -47,6 +47,8 @@ class LLMResponse:
     output_tokens: int | None = None
     latency_ms: int | None = None
     cache_hit: bool = False
+    finish_reason: str | None = None   # "stop" | "length" | "content_filter" | None
+    max_tokens_used: int = 2048        # the max_tokens value that was sent
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,6 +145,8 @@ class _DiskCache:
                 input_tokens=data.get("input_tokens"),
                 output_tokens=data.get("output_tokens"),
                 latency_ms=data.get("latency_ms"),
+                finish_reason=data.get("finish_reason"),
+                max_tokens_used=data.get("max_tokens_used", 2048),
                 cache_hit=True,
             )
         except Exception:
@@ -158,6 +162,8 @@ class _DiskCache:
             "input_tokens": resp.input_tokens,
             "output_tokens": resp.output_tokens,
             "latency_ms": resp.latency_ms,
+            "finish_reason": resp.finish_reason,
+            "max_tokens_used": resp.max_tokens_used,
         }
         p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -298,12 +304,20 @@ class OpenAICompatibleService(LLMService):
             raise ValueError(f"Unexpected response shape: {str(data)[:200]}")
 
         usage = data.get("usage", {})
+        finish_reason = None
+        try:
+            finish_reason = data["choices"][0].get("finish_reason")
+        except (KeyError, IndexError):
+            pass
+
         return LLMResponse(
             text=text,
             model_name=self._model,
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
             latency_ms=latency,
+            finish_reason=finish_reason,
+            max_tokens_used=max_tokens,
         )
 
 
@@ -615,12 +629,17 @@ class OllamaService(LLMService):
             except json.JSONDecodeError:
                 text = _repair_json(text)
 
+        # Ollama signals truncation via done_reason
+        finish_reason = data.get("done_reason")  # "stop" | "length" | None
+
         return LLMResponse(
             text=text,
             model_name=self.model_name,
             input_tokens=data.get("prompt_eval_count"),
             output_tokens=data.get("eval_count"),
             latency_ms=latency,
+            finish_reason=finish_reason,
+            max_tokens_used=max_tokens,
         )
 
 

@@ -4,18 +4,28 @@ INPUT:  transcript TEXT only (no timing, no delivery features)
 OUTPUT: ContentResult
 
 STRUCTURAL ISOLATION GUARANTEE:
-  - The public entry point analyze() accepts ONLY (transcript_text, rubric_criteria).
-  - If ablation mode is enabled, delivery_features dict MAY be passed but is
-    clearly marked and tested separately.
+  - analyze() accepts ONLY (transcript_text, rubric_criteria).
   - This module does NOT import DeliveryEngine or DeliveryResult.
 
-Every LLM call is persisted to llm_call_logs.
+Truncation handling:
+  - Every call records finish_reason and completion_tokens from the provider.
+  - finish_reason == "length" → TruncatedOutputError is raised.
+  - The caller retries ONCE with max_tokens doubled. Unchanged requests are
+    never retried — only after the token budget increases.
+  - A failed call stays None in the result; it is never guessed.
+
+Prompt v2 changes (vs v1):
+  - Evidence ≤ 15 words.
+  - At most 3 covered_concepts and 3 missing_concepts per criterion.
+  - No extra prose fields.
+  - Instruction: "Return ONLY the JSON object, no other text."
 """
 from __future__ import annotations
 
 import json
 import re
 from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -24,7 +34,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.models.core import LLMCallLog
-from app.services.llm import LLMService
+from app.services.llm import LLMResponse, LLMService
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,7 +44,7 @@ from app.services.llm import LLMService
 @dataclass
 class RubricCriterion:
     criterion_name: str
-    criterion_type: str          # correctness | relevance | completeness | concept_coverage | star_structure
+    criterion_type: str
     weight: float = 1.0
     expected_concepts: list[str] = field(default_factory=list)
     star_component: bool = False
@@ -42,23 +52,97 @@ class RubricCriterion:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pydantic output schema — validates LLM JSON strictly
+# Typed exception for truncated output
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TruncatedOutputError(Exception):
+    """Raised when finish_reason == 'length'. Carries how many tokens were used."""
+    def __init__(self, tokens_used: int, max_tokens: int):
+        self.tokens_used = tokens_used
+        self.max_tokens = max_tokens
+        super().__init__(
+            f"Output truncated: used {tokens_used} of {max_tokens} max_tokens "
+            f"(finish_reason='length'). Will retry with doubled budget."
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Call statistics (per ContentEngine instance)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class CallStats:
+    total: int = 0
+    truncated: int = 0   # finish_reason == "length"
+    retried: int = 0     # calls that needed a retry (any reason)
+    failed: int = 0      # calls that exhausted retries and returned None
+
+    _lock: Lock = field(default_factory=Lock, init=False, repr=False, compare=False)
+
+    def record_truncation(self) -> None:
+        with self._lock:
+            self.truncated += 1
+
+    def record_retry(self) -> None:
+        with self._lock:
+            self.retried += 1
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self.failed += 1
+
+    def record_call(self) -> None:
+        with self._lock:
+            self.total += 1
+
+    def summary(self) -> dict:
+        return {
+            "total_calls": self.total,
+            "truncated": self.truncated,
+            "retried": self.retried,
+            "failed": self.failed,
+        }
+
+    def print_summary(self) -> None:
+        print(
+            f"\n  Call stats: total={self.total}  truncated={self.truncated}  "
+            f"retried={self.retried}  failed={self.failed}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pydantic output schema
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CriterionResult(BaseModel):
     criterion_name: str
     score: float = Field(ge=0.0, le=1.0)
+    # v2: at most 3 items each
     covered_concepts: list[str] = Field(default_factory=list)
     missing_concepts: list[str] = Field(default_factory=list)
-    # Must be a verbatim quote or phrase from the transcript
+    # v2: ≤ 15 words
     evidence: str = ""
-    # Only populated for STAR criteria
     star_component: str | None = None
 
     @field_validator("score", mode="before")
     @classmethod
     def clamp_score(cls, v: Any) -> float:
         return max(0.0, min(1.0, float(v)))
+
+    @field_validator("covered_concepts", "missing_concepts", mode="before")
+    @classmethod
+    def cap_concepts(cls, v: Any) -> list:
+        if isinstance(v, list):
+            return v[:3]
+        return []
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def cap_evidence(cls, v: Any) -> str:
+        if not isinstance(v, str):
+            return ""
+        words = v.split()
+        return " ".join(words[:15])
 
 
 class STARDetection(BaseModel):
@@ -69,7 +153,6 @@ class STARDetection(BaseModel):
 
 
 class ContentEvalOutput(BaseModel):
-    """Full structured output from the LLM content judge."""
     criteria: list[CriterionResult]
     overall_score: float = Field(ge=0.0, le=1.0)
     star_detected: STARDetection = Field(default_factory=STARDetection)
@@ -97,10 +180,10 @@ class ContentResult:
     evidence_json: dict
     used_delivery_features: bool
     uncertainty: bool
+    prompt_version: str = "v2"
     llm_call_log_id: int | None = None
 
     def score_by_criterion(self, name: str) -> float | None:
-        """Convenience: look up any criterion by name."""
         return {
             "correctness": self.correctness_score,
             "coverage": self.coverage_score,
@@ -111,62 +194,40 @@ class ContentResult:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Prompt builder
+# Prompt v2
 # ─────────────────────────────────────────────────────────────────────────────
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
-_RUBRIC_JUDGE_PROMPT = """\
-You are a placement interview evaluator. Your job is to assess the CONTENT of a candidate's spoken answer.
+# v2 is deliberately compact:
+# - "Return ONLY the JSON object, no other text." at the top
+# - evidence capped at 15 words in the schema comment
+# - at most 3 concepts per list
+# - no scoring_guide repeated back, no extra prose fields
+_RUBRIC_JUDGE_PROMPT_V2 = """\
+Return ONLY the JSON object below, no other text.
 
-## IMPORTANT RULES
-1. Evaluate ONLY what was said (semantic content). Ignore speaking pace, pauses, fillers, or grammar.
-2. Base your scores strictly on the rubric criteria provided.
-3. For each criterion, quote a SHORT piece of evidence directly from the transcript.
-4. Return ONLY valid JSON matching the schema below. No prose outside the JSON.
+You are an interview content evaluator. Score ONLY the semantic content \
+(what was said). Ignore speaking pace, pauses, fillers, grammar, or delivery.
 
-## Question
-{question_text}
+Question: {question_text}
 
-## Transcript (candidate's answer)
-\"\"\"
-{transcript_text}
-\"\"\"
+Transcript: {transcript_text}
 
-## Rubric Criteria
-{rubric_json}
-
+Rubric: {rubric_json}
 {delivery_section}
+JSON schema (fill every field):
+{{"criteria":[{{"criterion_name":"<name>","score":<0.0-1.0>,\
+"covered_concepts":["<concept>",...MAX 3],"missing_concepts":["<concept>",...MAX 3],\
+"evidence":"<≤15 words verbatim from transcript>",\
+"star_component":"<Situation|Task|Action|Result|null>"}},...],\
+"overall_score":<weighted average 0.0-1.0>,\
+"star_detected":{{"situation":<bool>,"task":<bool>,"action":<bool>,"result":<bool>}},\
+"uncertainty":<bool>,"uncertainty_reason":"<string or null>"}}"""
 
-## Output JSON Schema
-{{
-  "criteria": [
-    {{
-      "criterion_name": "<name>",
-      "score": <float 0.0–1.0>,
-      "covered_concepts": ["<concept>", ...],
-      "missing_concepts": ["<concept>", ...],
-      "evidence": "<verbatim phrase from transcript>",
-      "star_component": "<Situation|Task|Action|Result|null>"
-    }}
-  ],
-  "overall_score": <weighted average 0.0–1.0>,
-  "star_detected": {{
-    "situation": <bool>,
-    "task": <bool>,
-    "action": <bool>,
-    "result": <bool>
-  }},
-  "uncertainty": <bool>,
-  "uncertainty_reason": "<string or null>"
-}}
-"""
-
-_DELIVERY_SECTION_ABLATION = """\
-## Delivery Features (ablation mode — for research comparison only)
-{delivery_json}
-NOTE: You MAY use these features to adjust scoring. This is the ABLATION condition.
-"""
+_DELIVERY_SECTION_ABLATION = (
+    "\nDelivery features (ablation — research only): {delivery_json}\n"
+)
 
 
 def _build_prompt(
@@ -175,28 +236,27 @@ def _build_prompt(
     rubric_criteria: list[RubricCriterion],
     delivery_features: dict | None = None,
 ) -> str:
+    # Keep rubric compact — only name, type, weight, concepts (no scoring_guide)
     rubric_json = json.dumps(
         [
             {
                 "criterion_name": c.criterion_name,
                 "criterion_type": c.criterion_type,
                 "weight": c.weight,
-                "expected_concepts": c.expected_concepts,
-                "star_component": c.star_component,
-                "scoring_guide": c.scoring_guide,
+                "expected_concepts": c.expected_concepts[:5],  # cap at 5
             }
             for c in rubric_criteria
         ],
-        indent=2,
+        separators=(",", ":"),  # no whitespace → smaller prompt
     )
 
     delivery_section = ""
     if delivery_features:
         delivery_section = _DELIVERY_SECTION_ABLATION.format(
-            delivery_json=json.dumps(delivery_features, indent=2)
+            delivery_json=json.dumps(delivery_features, separators=(",", ":"))
         )
 
-    return _RUBRIC_JUDGE_PROMPT.format(
+    return _RUBRIC_JUDGE_PROMPT_V2.format(
         question_text=question_text,
         transcript_text=transcript_text,
         rubric_json=rubric_json,
@@ -208,17 +268,21 @@ def _build_prompt(
 # Engine
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ContentEngine:
-    """LLM rubric judge. Receives transcript text only (no timing data).
+# Default starting max_tokens for content eval calls
+_DEFAULT_MAX_TOKENS = 2048
+# Maximum we'll ever double up to before giving up
+_MAX_TOKENS_CEILING = 8192
 
-    Structural isolation: this class must NEVER receive DeliveryResult
-    or WordTimestamp objects unless ablation mode is explicitly enabled.
-    """
+
+class ContentEngine:
+    """LLM rubric judge. Receives transcript text only."""
 
     def __init__(self, llm: LLMService, db: Session | None = None):
         self._llm = llm
         self._db = db
         self._settings = get_settings()
+        # Shared stats across all calls in this engine instance
+        self.stats = CallStats()
 
     def analyze(
         self,
@@ -228,18 +292,10 @@ class ContentEngine:
         *,
         delivery_features: dict | None = None,
     ) -> ContentResult:
-        """Evaluate the content of a transcript against rubric criteria.
-
-        Args:
-            transcript_text: The plain text transcript. NO timing data.
-            question_text:   The original interview question.
-            rubric_criteria: List of rubric criteria for this question.
-            delivery_features: Optional dict of delivery metrics (ablation only).
-                               Only used when settings.content_engine_include_delivery=True.
-        """
         settings = get_settings()
-        # Enforce isolation: only pass delivery if ablation is on
-        effective_delivery = delivery_features if settings.content_engine_include_delivery else None
+        effective_delivery = (
+            delivery_features if settings.content_engine_include_delivery else None
+        )
 
         prompt = _build_prompt(
             question_text=question_text,
@@ -248,28 +304,83 @@ class ContentEngine:
             delivery_features=effective_delivery,
         )
 
-        llm_response, parsed, log_id = self._call_with_retry(prompt, prompt_version=settings.content_engine_prompt_version)
+        pv = settings.content_engine_prompt_version
+        llm_response, parsed, log_id = self._call_with_length_retry(
+            prompt, prompt_version=pv
+        )
 
-        return self._build_result(parsed, used_delivery=(effective_delivery is not None), log_id=log_id)
+        return self._build_result(
+            parsed,
+            used_delivery=(effective_delivery is not None),
+            log_id=log_id,
+            prompt_version=pv,
+        )
+
+    def _call_with_length_retry(
+        self,
+        prompt: str,
+        prompt_version: str,
+    ) -> tuple[LLMResponse, ContentEvalOutput, int | None]:
+        """Call LLM. On finish_reason==length, retry ONCE with doubled budget."""
+        max_tokens = _DEFAULT_MAX_TOKENS
+        last_exc: Exception | None = None
+
+        for attempt in range(2):  # attempt 0: normal, attempt 1: doubled budget
+            if attempt == 1:
+                max_tokens = min(max_tokens * 2, _MAX_TOKENS_CEILING)
+                self.stats.record_retry()
+
+            self.stats.record_call()
+            try:
+                result = self._call_with_parse_retry(
+                    prompt, prompt_version=prompt_version, max_tokens=max_tokens
+                )
+                return result
+            except TruncatedOutputError as exc:
+                self.stats.record_truncation()
+                last_exc = exc
+                # loop around with doubled budget
+                continue
+            except Exception as exc:
+                last_exc = exc
+                break  # non-truncation failure — don't retry here
+
+        # Exhausted attempts
+        self.stats.record_failure()
+        raise last_exc  # type: ignore[misc]
 
     @retry(
-        stop=stop_after_attempt(4),
+        stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
         reraise=True,
     )
-    def _call_with_retry(self, prompt: str, prompt_version: str = "v1") -> tuple[Any, ContentEvalOutput, int | None]:
-        """Call LLM, validate JSON, retry on parse failure or truncation."""
+    def _call_with_parse_retry(
+        self,
+        prompt: str,
+        *,
+        prompt_version: str,
+        max_tokens: int,
+    ) -> tuple[LLMResponse, ContentEvalOutput, int | None]:
+        """Call LLM and parse JSON. Retries up to 3x on parse failures.
+
+        Raises TruncatedOutputError immediately (no parse retry useful there).
+        """
         llm_resp = self._llm.complete(
             prompt,
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=max_tokens,
             prompt_version=prompt_version,
         )
         raw = llm_resp.text
 
-        # Extract JSON block (handle markdown code fences)
-        json_str = self._extract_json(raw)
+        # Check for truncation BEFORE trying to parse
+        if llm_resp.finish_reason == "length":
+            raise TruncatedOutputError(
+                tokens_used=llm_resp.output_tokens or max_tokens,
+                max_tokens=max_tokens,
+            )
 
+        json_str = self._extract_json(raw)
         parsed_data = json.loads(json_str)
         validated = ContentEvalOutput.model_validate(parsed_data)
 
@@ -278,20 +389,18 @@ class ContentEngine:
             raw_output=raw,
             parsed_ok=True,
             llm_resp=llm_resp,
+            prompt_version=prompt_version,
         )
         return llm_resp, validated, log_id
 
     def _extract_json(self, text: str) -> str:
-        """Strip markdown fences and extract the outermost JSON object.
+        """Extract outermost JSON object using brace-depth counting.
 
-        Uses brace-depth counting so it finds the full outer {…} even when
-        the content contains nested objects. Also handles truncated JSON by
-        applying the same repair logic used in OllamaService.
+        Handles: markdown fences, nested objects, truncated output,
+        trailing commas.
         """
-        # Strip markdown fences first
         text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
-        # Find the start of the first { or [
         start = -1
         open_ch = close_ch = ""
         for i, ch in enumerate(text):
@@ -303,11 +412,11 @@ class ContentEngine:
                 break
 
         if start == -1:
-            raise ValueError(f"No JSON object found in LLM output: {text[:200]}")
+            raise ValueError(
+                f"No JSON object in LLM output: {text[:200]}"
+            )
 
-        # Walk to find the matching close brace by depth
-        depth = 0
-        end = -1
+        depth, end = 0, -1
         for i, ch in enumerate(text[start:], start=start):
             if ch == open_ch:
                 depth += 1
@@ -317,13 +426,8 @@ class ContentEngine:
                     end = i
                     break
 
-        if end != -1:
-            candidate = text[start:end + 1]
-        else:
-            # Truncated — take what we have and try to repair
-            candidate = text[start:]
-
-        # Remove trailing commas before } or ] (common small-model failure)
+        candidate = text[start:end + 1] if end != -1 else text[start:]
+        # Remove trailing commas
         candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
         return candidate
 
@@ -332,13 +436,14 @@ class ContentEngine:
         prompt: str,
         raw_output: str,
         parsed_ok: bool,
-        llm_resp: Any,
+        llm_resp: LLMResponse,
+        prompt_version: str,
     ) -> int | None:
         if self._db is None:
             return None
         log = LLMCallLog(
             model_name=self._llm.model_name,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
             call_type="content_eval",
             prompt_text=prompt,
             raw_output=raw_output,
@@ -357,11 +462,12 @@ class ContentEngine:
         parsed: ContentEvalOutput,
         used_delivery: bool,
         log_id: int | None,
+        prompt_version: str,
     ) -> ContentResult:
-        # Map criterion names to standard slots
-        scores: dict[str, float] = {}
-        for cr in parsed.criteria:
-            scores[cr.criterion_name.lower()] = cr.score
+        scores: dict[str, float] = {
+            cr.criterion_name.lower(): cr.score
+            for cr in parsed.criteria
+        }
 
         def _find(*keys: str) -> float | None:
             for k in keys:
@@ -386,5 +492,6 @@ class ContentEngine:
             evidence_json=evidence_json,
             used_delivery_features=used_delivery,
             uncertainty=parsed.uncertainty,
+            prompt_version=prompt_version,
             llm_call_log_id=log_id,
         )

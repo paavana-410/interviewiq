@@ -15,4 +15,5 @@ Format: `run_id | date | tag | judges | n_items | prompt_v | git_hash | di_pass%
 | 20261103T161326_pilot_text_498db2a2 | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
 | 20261103T162131_pilot_text_94a0c18b | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
 | 20261103T162824_pilot_text_82c8318b | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | 100% | 0% | 67% | 100% | 81% | **OK** |
+| 20261103T171150_pilot_text_91a4340e | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv2 | `58b7114d` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
 <!-- EXPERIMENT_LOG_END — do not remove this line -->

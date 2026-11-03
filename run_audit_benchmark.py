@@ -176,6 +176,7 @@ class BenchmarkRow:
     metric_value: float
     passed: bool
     threshold: float
+    prompt_version: str = "v2"
     details: str = ""
 
 
@@ -186,6 +187,7 @@ class JudgeRunResult:
     status: Literal["ok", "failed"]
     failure_reason: str = ""
     rows: list[BenchmarkRow] = field(default_factory=list)
+    call_stats: dict = field(default_factory=dict)  # from ContentEngine.stats.summary()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -305,6 +307,7 @@ def run_benchmark_for_judge(
     content_engine = ContentEngine(llm=llm_service, db=None)
     delivery_engine = DeliveryEngine()
     generator = VariantGenerator(seed=seed)
+    pv = settings.content_engine_prompt_version
 
     try:
         para_service = get_paraphrase_service()
@@ -332,6 +335,7 @@ def run_benchmark_for_judge(
             metric_value=value,
             passed=passed,
             threshold=threshold,
+            prompt_version=pv,
             details=json.dumps(details or {}),
         ))
 
@@ -501,6 +505,7 @@ def run_benchmark_for_judge(
             status="failed",
             failure_reason=safe,
             rows=[],
+            call_stats=content_engine.stats.summary(),
         )
 
     return JudgeRunResult(
@@ -508,6 +513,7 @@ def run_benchmark_for_judge(
         judge_model=llm_service.model_name,
         status="ok",
         rows=rows,
+        call_stats=content_engine.stats.summary(),
     )
 
 
@@ -1138,6 +1144,37 @@ def main(
             mv = grp["metric_value"].mean()
             icon = "✓" if pr >= 80 else "✗"
             click.echo(f"  {icon} {tn:<35}  pass={pr:.0f}%  mean={mv:.4f}")
+
+    # ── Call stats per judge ─────────────────────────────────────────────────
+    click.echo("\n── Call stats ─────────────────────────────────────────────")
+    totals = {"total_calls": 0, "truncated": 0, "retried": 0, "failed": 0}
+    for jr in judge_results:
+        cs = jr.call_stats
+        if cs:
+            click.echo(
+                f"  {jr.judge_name:<30}  total={cs.get('total_calls',0)}  "
+                f"truncated={cs.get('truncated',0)}  "
+                f"retried={cs.get('retried',0)}  "
+                f"failed={cs.get('failed',0)}"
+            )
+            for k in totals:
+                totals[k] += cs.get(k, 0)
+    if len(judge_results) > 1:
+        click.echo(
+            f"  {'TOTAL':<30}  total={totals['total_calls']}  "
+            f"truncated={totals['truncated']}  "
+            f"retried={totals['retried']}  "
+            f"failed={totals['failed']}"
+        )
+    # Save to summary.json
+    try:
+        run_summary_path = out_dir / "summary.json"
+        if run_summary_path.exists():
+            existing = json.loads(run_summary_path.read_text(encoding="utf-8"))
+            existing["call_stats"] = {jr.judge_name: jr.call_stats for jr in judge_results}
+            run_summary_path.write_text(json.dumps(existing, indent=2))
+    except Exception:
+        pass
 
     status_color = {"ok": "green", "partial": "yellow", "failed": "red"}[run_status]
     click.secho(f"\nRun status : {run_status.upper()}", fg=status_color, bold=True)
