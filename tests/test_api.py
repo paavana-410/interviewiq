@@ -10,14 +10,14 @@ os.environ["LLM_PROVIDER"] = "mock"
 os.environ["DATABASE_URL"] = "sqlite:///./test_api.db"
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from app.database import Base, get_db
+from app.database import Base, get_db, _is_sqlite
 from app.main import app
 
 
-# ── In-memory SQLite DB for API tests ────────────────────────────────────────
+# ── SQLite DB for API tests ───────────────────────────────────────────────────
 
 TEST_DB_URL = "sqlite:///./test_api.db"
 

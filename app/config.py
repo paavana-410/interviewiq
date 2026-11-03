@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database ──────────────────────────────────────────────────────────────
-    database_url: str = "postgresql://interviewiq:interviewiq@localhost:5432/interviewiq"
+    database_url: str = "sqlite:///interviewiq.db"   # SQLite default; set DATABASE_URL=postgresql://... for Postgres
 
     # ── LLM mode ─────────────────────────────────────────────────────────────
     # Set to "mock" to disable all real LLM calls (tests / CI).
@@ -29,9 +29,19 @@ class Settings(BaseSettings):
     holistic_engine_prompt_version: str = "v1"
 
     # ── STT ───────────────────────────────────────────────────────────────────
+    # Never default to medium or large — too heavy for a laptop
     whisper_model_size: str = "base"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+
+    # ── Ollama ────────────────────────────────────────────────────────────────
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2"          # 3B — fits in ~2GB RAM
+    ollama_num_ctx: int = 2048              # keep small; 4096 max
+    ollama_num_parallel: int = 1
+
+    # ── Memory guard ─────────────────────────────────────────────────────────
+    memory_warn_below_gb: float = 1.5       # warn if less than this is available before stage
 
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5

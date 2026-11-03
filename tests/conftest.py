@@ -7,6 +7,7 @@ import pytest
 
 # Use mock provider for all tests — no API keys needed
 os.environ.setdefault("LLM_PROVIDER", "mock")
+# Default to SQLite for tests — no server needed
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_interviewiq.db")
 
 

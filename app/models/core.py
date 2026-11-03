@@ -5,7 +5,6 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     DateTime,
     Enum,
@@ -16,10 +15,32 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def _json_col():
+    """Return a dialect-aware JSON column.
+
+    Uses JSONB on PostgreSQL (efficient indexing) and plain JSON (TEXT-backed)
+    on SQLite, so the same model works on both without migration changes.
+    """
+    from sqlalchemy import event
+    from sqlalchemy.dialects.postgresql import JSONB as _JSONB
+
+    class _AdaptiveJSON(JSON):
+        """Subclass that renders as JSONB on Postgres, JSON elsewhere."""
+        def __init__(self):
+            super().__init__(none_as_null=True)
+
+        def load_dialect_impl(self, dialect):
+            if dialect.name == "postgresql":
+                return dialect.type_descriptor(_JSONB())
+            return dialect.type_descriptor(JSON(none_as_null=True))
+
+    return mapped_column(_AdaptiveJSON(), nullable=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -106,7 +127,7 @@ class Rubric(Base):
     )
     weight: Mapped[float] = mapped_column(Float, default=1.0)
     # JSON list of expected concept strings
-    expected_concepts: Mapped[dict | list | None] = mapped_column(JSONB)
+    expected_concepts: Mapped[dict | list | None] = _json_col()
     star_component: Mapped[bool] = mapped_column(Boolean, default=False)
     # Full scoring guide text
     scoring_guide: Mapped[str | None] = mapped_column(Text)
@@ -179,7 +200,7 @@ class Transcript(Base):
     )
     transcript_text: Mapped[str] = mapped_column(Text, nullable=False)
     # JSON list of {word, start, end, probability} dicts
-    word_timestamps: Mapped[list | None] = mapped_column(JSONB)
+    word_timestamps: Mapped[list | None] = _json_col()
     stt_model: Mapped[str | None] = mapped_column(String(100))
     confidence: Mapped[float | None] = mapped_column(Float)
     # "whisper" | "gold" | "mock"
@@ -211,7 +232,7 @@ class ContentEvaluation(Base):
     # Composite weighted score
     overall_score: Mapped[float | None] = mapped_column(Float)
     # Full structured evidence: {criterion: {score, covered, missing, evidence, star_component}}
-    evidence_json: Mapped[dict | None] = mapped_column(JSONB)
+    evidence_json: Mapped[dict | None] = _json_col()
     # Whether delivery features were fed in (ablation flag)
     used_delivery_features: Mapped[bool] = mapped_column(Boolean, default=False)
     llm_call_log_id: Mapped[int | None] = mapped_column(
@@ -244,7 +265,7 @@ class DeliveryMetrics(Base):
     repetition_count: Mapped[int | None] = mapped_column(Integer)
     duration_sec: Mapped[int | None] = mapped_column(Integer)
     # Detailed breakdown: {pause_positions, filler_positions, repetitions_detail}
-    detail_json: Mapped[dict | None] = mapped_column(JSONB)
+    detail_json: Mapped[dict | None] = _json_col()
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -270,7 +291,7 @@ class AuditResult(Base):
     stt_sensitivity: Mapped[float | None] = mapped_column(Float)
     uncertainty_flag: Mapped[bool] = mapped_column(Boolean, default=False)
     # Full per-test details
-    details_json: Mapped[dict | None] = mapped_column(JSONB)
+    details_json: Mapped[dict | None] = _json_col()
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -293,7 +314,7 @@ class FeedbackReport(Base):
     strengths: Mapped[str | None] = mapped_column(Text)
     improvements: Mapped[str | None] = mapped_column(Text)
     # Full criterion-level structured feedback
-    criterion_feedback_json: Mapped[dict | None] = mapped_column(JSONB)
+    criterion_feedback_json: Mapped[dict | None] = _json_col()
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -368,3 +389,4 @@ class HumanAnnotation(Base):
 
     annotator: Mapped["User"] = relationship(back_populates="annotations")
     response: Mapped["Response"] = relationship(back_populates="annotations")
+

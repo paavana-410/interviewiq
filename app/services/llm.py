@@ -472,3 +472,158 @@ def get_all_judge_services() -> list[tuple[str, LLMService]]:
         (j.name, OpenAICompatibleService(j, cache_dir=cache))
         for j in registry.judges
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ollama service — local model, small context, JSON-repair fallback
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _repair_json(text: str) -> str:
+    """Best-effort JSON repair for malformed LLM output.
+
+    Handles the most common failure modes from small local models:
+    - Trailing commas
+    - Missing closing braces/brackets
+    - Text before/after the JSON object
+    """
+    import re as _re
+    # Strip markdown fences
+    text = _re.sub(r"```(?:json)?", "", text).strip()
+    # Find first { ... } or [ ... ]
+    for start_ch, end_ch in (('{', '}'), ('[', ']')):
+        start = text.find(start_ch)
+        if start == -1:
+            continue
+        # Walk backwards to find the last matching close
+        depth = 0
+        end = -1
+        for i, ch in enumerate(text[start:], start=start):
+            if ch == start_ch:
+                depth += 1
+            elif ch == end_ch:
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end != -1:
+            candidate = text[start:end + 1]
+            # Remove trailing commas before } or ]
+            candidate = _re.sub(r',\s*([}\]])', r'\1', candidate)
+            return candidate
+    return text
+
+
+class OllamaService(LLMService):
+    """Local Ollama judge. Uses httpx directly, small context window.
+
+    Loaded only during the local_judge stage. Never co-loaded with Whisper.
+    Config comes from .env: OLLAMA_MODEL, OLLAMA_NUM_CTX, OLLAMA_BASE_URL.
+    """
+
+    def __init__(self, cache_dir: Path | None = None):
+        from app.config import get_settings
+        s = get_settings()
+        self._base_url = s.ollama_base_url.rstrip("/")
+        self._model = s.ollama_model
+        self._num_ctx = min(max(s.ollama_num_ctx, 512), 4096)  # clamp 512–4096
+        self._cache = _DiskCache(cache_dir) if cache_dir else None
+        self._bucket = _TokenBucket(60)  # local: 60 rpm ceiling
+
+    @property
+    def model_name(self) -> str:
+        return f"ollama/{self._model}"
+
+    @property
+    def provider(self) -> str:
+        return "ollama"
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.0,
+        max_tokens: int = 1024,
+        prompt_version: str = "v1",
+    ) -> LLMResponse:
+        if self._cache and temperature == 0.0:
+            cached = self._cache.get(self.model_name, prompt_version, prompt)
+            if cached is not None:
+                return cached
+
+        resp = self._complete_with_retry(
+            prompt, temperature=temperature, max_tokens=max_tokens
+        )
+
+        if self._cache and temperature == 0.0:
+            self._cache.put(self.model_name, prompt_version, prompt, resp)
+
+        return resp
+
+    @retry(
+        retry=retry_if_exception_type((IOError, TimeoutError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(multiplier=2, max=30, jitter=2),
+        reraise=True,
+    )
+    def _complete_with_retry(
+        self, prompt: str, *, temperature: float, max_tokens: int
+    ) -> LLMResponse:
+        import httpx as _httpx
+
+        self._bucket.acquire()
+        url = self._base_url + "/api/chat"
+        body = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+                "num_ctx": self._num_ctx,
+            },
+        }
+
+        t0 = time.monotonic()
+        try:
+            with _httpx.Client(timeout=120.0) as client:
+                r = client.post(url, json=body)
+        except _httpx.TimeoutException:
+            raise TimeoutError(f"Ollama timed out after 120s (model={self._model})")
+        except _httpx.ConnectError:
+            raise ConnectionError(
+                f"Cannot connect to Ollama at {self._base_url}. "
+                "Is `ollama serve` running?"
+            )
+
+        latency = int((time.monotonic() - t0) * 1000)
+
+        if r.status_code == 404:
+            raise LookupError(
+                f"Ollama model '{self._model}' not found. "
+                f"Run: ollama pull {self._model}"
+            )
+        if r.status_code != 200:
+            raise IOError(f"Ollama HTTP {r.status_code}: {r.text[:150]}")
+
+        data = r.json()
+        text = data.get("message", {}).get("content", "") or ""
+
+        # Attempt JSON repair if the response looks like broken JSON
+        if text.strip().startswith(("{", "[")):
+            try:
+                json.loads(text)
+            except json.JSONDecodeError:
+                text = _repair_json(text)
+
+        return LLMResponse(
+            text=text,
+            model_name=self.model_name,
+            input_tokens=data.get("prompt_eval_count"),
+            output_tokens=data.get("eval_count"),
+            latency_ms=latency,
+        )
+
+
+def get_ollama_service() -> OllamaService:
+    """Return an OllamaService using settings from .env."""
+    return OllamaService(cache_dir=_cache_dir())

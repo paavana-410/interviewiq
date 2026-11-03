@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "001"
 down_revision = None
@@ -56,7 +55,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("weight", sa.Float, server_default="1.0"),
-        sa.Column("expected_concepts", JSONB),
+        sa.Column("expected_concepts", sa.JSON),
         sa.Column("star_component", sa.Boolean, server_default="false"),
         sa.Column("scoring_guide", sa.Text),
     )
@@ -114,7 +113,7 @@ def upgrade() -> None:
         sa.Column("transcript_id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column("response_id", sa.Integer, sa.ForeignKey("responses.response_id", ondelete="CASCADE"), nullable=False),
         sa.Column("transcript_text", sa.Text, nullable=False),
-        sa.Column("word_timestamps", JSONB),
+        sa.Column("word_timestamps", sa.JSON),
         sa.Column("stt_model", sa.String(100)),
         sa.Column("confidence", sa.Float),
         sa.Column("source", sa.String(50), server_default="whisper"),
@@ -132,7 +131,7 @@ def upgrade() -> None:
         sa.Column("completeness_score", sa.Float),
         sa.Column("star_score", sa.Float),
         sa.Column("overall_score", sa.Float),
-        sa.Column("evidence_json", JSONB),
+        sa.Column("evidence_json", sa.JSON),
         sa.Column("used_delivery_features", sa.Boolean, server_default="false"),
         sa.Column("llm_call_log_id", sa.Integer, sa.ForeignKey("llm_call_logs.log_id", ondelete="SET NULL")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -150,7 +149,7 @@ def upgrade() -> None:
         sa.Column("filler_density", sa.Float),
         sa.Column("repetition_count", sa.Integer),
         sa.Column("duration_sec", sa.Integer),
-        sa.Column("detail_json", JSONB),
+        sa.Column("detail_json", sa.JSON),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -165,7 +164,7 @@ def upgrade() -> None:
         sa.Column("repeatability_variance", sa.Float),
         sa.Column("stt_sensitivity", sa.Float),
         sa.Column("uncertainty_flag", sa.Boolean, server_default="false"),
-        sa.Column("details_json", JSONB),
+        sa.Column("details_json", sa.JSON),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -177,7 +176,7 @@ def upgrade() -> None:
         sa.Column("summary_text", sa.Text),
         sa.Column("strengths", sa.Text),
         sa.Column("improvements", sa.Text),
-        sa.Column("criterion_feedback_json", JSONB),
+        sa.Column("criterion_feedback_json", sa.JSON),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -224,3 +223,5 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS criteriontype")
     op.execute("DROP TYPE IF EXISTS sessionmode")
     op.execute("DROP TYPE IF EXISTS sessionstatus")
+
+

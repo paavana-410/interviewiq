@@ -253,16 +253,16 @@ class ContentEngine:
         return self._build_result(parsed, used_delivery=(effective_delivery is not None), log_id=log_id)
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(4),
         wait=wait_exponential(multiplier=1, min=1, max=8),
         reraise=True,
     )
     def _call_with_retry(self, prompt: str, prompt_version: str = "v1") -> tuple[Any, ContentEvalOutput, int | None]:
-        """Call LLM, validate JSON, retry on parse failure."""
+        """Call LLM, validate JSON, retry on parse failure or truncation."""
         llm_resp = self._llm.complete(
             prompt,
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,
             prompt_version=prompt_version,
         )
         raw = llm_resp.text
@@ -282,16 +282,50 @@ class ContentEngine:
         return llm_resp, validated, log_id
 
     def _extract_json(self, text: str) -> str:
-        """Strip markdown fences and extract the JSON object."""
-        # Try ```json ... ``` or ``` ... ```
-        fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-        if fence:
-            return fence.group(1)
-        # Fallback: find first { ... }
-        brace = re.search(r"(\{.*\})", text, re.DOTALL)
-        if brace:
-            return brace.group(1)
-        raise ValueError(f"No JSON object found in LLM output: {text[:200]}")
+        """Strip markdown fences and extract the outermost JSON object.
+
+        Uses brace-depth counting so it finds the full outer {…} even when
+        the content contains nested objects. Also handles truncated JSON by
+        applying the same repair logic used in OllamaService.
+        """
+        # Strip markdown fences first
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+
+        # Find the start of the first { or [
+        start = -1
+        open_ch = close_ch = ""
+        for i, ch in enumerate(text):
+            if ch == "{":
+                start, open_ch, close_ch = i, "{", "}"
+                break
+            if ch == "[":
+                start, open_ch, close_ch = i, "[", "]"
+                break
+
+        if start == -1:
+            raise ValueError(f"No JSON object found in LLM output: {text[:200]}")
+
+        # Walk to find the matching close brace by depth
+        depth = 0
+        end = -1
+        for i, ch in enumerate(text[start:], start=start):
+            if ch == open_ch:
+                depth += 1
+            elif ch == close_ch:
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+
+        if end != -1:
+            candidate = text[start:end + 1]
+        else:
+            # Truncated — take what we have and try to repair
+            candidate = text[start:]
+
+        # Remove trailing commas before } or ] (common small-model failure)
+        candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
+        return candidate
 
     def _persist_call(
         self,

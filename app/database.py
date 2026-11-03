@@ -1,7 +1,11 @@
-"""SQLAlchemy engine + session factory."""
+"""SQLAlchemy engine + session factory.
+
+Supports both SQLite (default, no server needed) and PostgreSQL.
+SQLite is the default for laptops; set DATABASE_URL=postgresql://... for Postgres.
+"""
 from __future__ import annotations
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import get_settings
@@ -15,34 +19,45 @@ _engine = None
 _SessionLocal = None
 
 
+def _is_sqlite(url: str) -> bool:
+    return url.startswith("sqlite")
+
+
 def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=True,
-            pool_size=10,
-            max_overflow=20,
-            echo=False,
-        )
+        url = settings.database_url
+        if _is_sqlite(url):
+            # SQLite: no connection pool, single-threaded safe
+            _engine = create_engine(
+                url,
+                connect_args={"check_same_thread": False},
+                echo=False,
+            )
+            # Enable WAL mode and foreign keys for SQLite
+            @event.listens_for(_engine, "connect")
+            def _sqlite_pragmas(conn, _):
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA foreign_keys=ON")
+        else:
+            _engine = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+                echo=False,
+            )
     return _engine
 
 
 def get_session_local():
     global _SessionLocal
     if _SessionLocal is None:
-        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+        _SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=get_engine()
+        )
     return _SessionLocal
-
-
-# Keep these module-level names for Alembic compatibility
-@property
-def engine():
-    return get_engine()
-
-
-SessionLocal = None  # lazy; use get_session_local() directly
 
 
 def get_db():

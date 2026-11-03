@@ -1,32 +1,52 @@
 #!/usr/bin/env python
 """run_audit_benchmark.py — Research benchmark CLI for InterviewIQ.
 
+Stage-based design (each stage loads only what it needs):
+
+    text        Hosted LLM judges over HTTP only.
+                No Whisper, no Ollama, no TTS loaded.
+                RAM: ~300 MB process + network calls.
+
+    local_judge Ollama local judge only.
+                OLLAMA_NUM_PARALLEL=1, short context (num_ctx ≤ 4096).
+                RAM: ~2–3 GB (model weights stay in Ollama process).
+                Never run together with the audio stage.
+
+    audio       TTS synthesis + faster-whisper transcription only.
+                Loads and unloads model after each file.
+                RAM: ~500 MB–1 GB peak (base Whisper).
+                Ollama must NOT be loaded — enforced at startup.
+
+    analysis    Reads saved results.csv, computes plots and summary.
+                RAM: ~200 MB (pandas + matplotlib only).
+
+Typical run order:
+    python run_audit_benchmark.py --stage text   --tag pilot --runs 1
+    python run_audit_benchmark.py --stage analysis --run-id <id>
+
 Usage:
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers --tag pilot
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers \\
-        --judges judge_nemotron,judge_gemini --tag pilot
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers --tag final
-    python run_audit_benchmark.py --answers-dir data/benchmark_answers --tag debug
+    python run_audit_benchmark.py \\
+        --answers-dir data/benchmark_answers \\
+        --stage text \\
+        --judges judge_gemini \\
+        --runs 1 \\
+        --tag pilot
 
-Tags:
-    debug  — real or mock calls; NOT logged to experiments.md; for local testing
-    mock   — mock LLM only; logged as mock (never cite)
+    # Resume analysis on a previous run
+    python run_audit_benchmark.py --stage analysis --run-id 20261103T...
+
+Tags: debug | mock | pilot | final
+    debug  — not logged to experiments.md; for local testing
+    mock   — mock LLM; always safe; results not citable
     pilot  — real calls, exploratory; logged; may cite as preliminary
-    final  — real calls; fails if working tree is dirty; logged as final
+    final  — real calls; working tree must be clean
 
-Per-judge failure policy:
-    If a judge returns 401/403/404, or fails the same call 3 times in a row,
-    that judge is aborted. Its status is recorded as "failed" in config.json
-    and experiments.md. Results from other judges are still written normally.
-    The run as a whole is marked "partial" if ≥1 judge failed, "ok" if all passed.
-
-Security:
-    API keys are never printed, logged, or included in any output file.
-    All error messages are masked before display.
+Security: API keys are never printed, logged, or written to any file.
 """
 from __future__ import annotations
 
 import csv
+import gc
 import json
 import os
 import subprocess
@@ -37,18 +57,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-# Load .env before any app imports
 from dotenv import load_dotenv  # type: ignore
 load_dotenv(override=False)
 
 import click
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Research record-keeping helpers
+# Git / pip helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _git_hash() -> str:
@@ -78,6 +96,10 @@ def _pip_freeze() -> list[str]:
         return []
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# experiments.md logger
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _append_to_experiments_log(
     run_id: str,
     tag: str,
@@ -86,10 +108,10 @@ def _append_to_experiments_log(
     prompt_version: str,
     git_hash: str,
     summary: dict,
-    run_status: str,         # "ok" | "partial" | "failed"
+    run_status: str,
     failed_judges: list[str],
+    stage: str,
 ) -> None:
-    """Append one row to docs/experiments.md. Never called for debug runs."""
     log_path = Path("docs/experiments.md")
     if not log_path.exists():
         return
@@ -110,10 +132,9 @@ def _append_to_experiments_log(
     if failed_judges:
         status_str += f" (failed: {', '.join(failed_judges)})"
 
-    judges_str = "/".join(judge_names)
     row = (
-        f"| {run_id} | {date_str} | **{tag}** | {judges_str} | {n_items} "
-        f"| v{prompt_version} | `{git_hash[:8]}` "
+        f"| {run_id} | {date_str} | **{tag}** | [{stage}] {'/'.join(judge_names)} "
+        f"| {n_items} | v{prompt_version} | `{git_hash[:8]}` "
         f"| {_pct('delivery_invariance')} | {_pct('content_sensitivity')} "
         f"| {_pct('paraphrase_stability')} | {_pct('repeated_run')} "
         f"| {overall} | {status_str} |"
@@ -163,7 +184,7 @@ class JudgeRunResult:
     judge_name: str
     judge_model: str
     status: Literal["ok", "failed"]
-    failure_reason: str = ""          # safe — no key values
+    failure_reason: str = ""
     rows: list[BenchmarkRow] = field(default_factory=list)
 
 
@@ -182,30 +203,25 @@ def load_answer_items(answers_dir: Path) -> list[AnswerItem]:
         if not answer_file.exists() or not question_file.exists():
             click.echo(f"  [skip] {sub.name}: missing answer.txt or question.txt")
             continue
-        answer_text = answer_file.read_text(encoding="utf-8").strip()
-        question_text = question_file.read_text(encoding="utf-8").strip()
-        rubric_criteria = (
-            json.loads(rubric_file.read_text(encoding="utf-8"))
-            if rubric_file.exists() else []
-        )
-        gold = (
-            (sub / "gold_transcript.txt").read_text(encoding="utf-8").strip()
-            if (sub / "gold_transcript.txt").exists() else None
-        )
-        audio = str(sub / "audio.wav") if (sub / "audio.wav").exists() else None
         items.append(AnswerItem(
             item_id=sub.name,
-            question_text=question_text,
-            answer_text=answer_text,
-            rubric_criteria=rubric_criteria,
-            gold_transcript=gold,
-            audio_path=audio,
+            question_text=question_file.read_text(encoding="utf-8").strip(),
+            answer_text=answer_file.read_text(encoding="utf-8").strip(),
+            rubric_criteria=(
+                json.loads(rubric_file.read_text(encoding="utf-8"))
+                if rubric_file.exists() else []
+            ),
+            gold_transcript=(
+                (sub / "gold_transcript.txt").read_text(encoding="utf-8").strip()
+                if (sub / "gold_transcript.txt").exists() else None
+            ),
+            audio_path=str(sub / "audio.wav") if (sub / "audio.wav").exists() else None,
         ))
     return items
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Judge resolution
+# Judge resolver
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_judges(judges_flag: str) -> list[tuple[str, object]]:
@@ -215,7 +231,6 @@ def resolve_judges(judges_flag: str) -> list[tuple[str, object]]:
         return [("mock", MockLLMService())]
 
     all_services = dict(get_all_judge_services())
-
     if judges_flag.strip().lower() == "all":
         return list(all_services.items())
 
@@ -231,36 +246,24 @@ def resolve_judges(judges_flag: str) -> list[tuple[str, object]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pre-flight check — probe each judge before starting
+# Pre-flight
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Non-retryable HTTP status codes — abort the judge immediately
-_FATAL_STATUS_CODES = {401, 403, 404}
-# How many consecutive failures before we give up on a judge
 _MAX_CONSECUTIVE_FAILURES = 3
 
 
-def _probe_judges(
-    judge_services: list[tuple[str, object]],
-    secrets: list[str],
-) -> dict[str, bool]:
-    """Pre-flight: probe every judge. Returns {judge_name: ok}."""
+def _probe_judges(judge_services: list[tuple[str, object]], secrets: list[str]) -> dict[str, bool]:
     from check_config import probe_judge
-    from app.services.judge_config import JudgeConfig
+    from app.services.judge_config import _mask_key
 
     results: dict[str, bool] = {}
     for judge_name, svc in judge_services:
-        if svc.provider == "mock":
+        if getattr(svc, "provider", "") == "mock":
             results[judge_name] = True
             continue
-
-        # Build a minimal JudgeConfig from the service for probing
-        cfg = svc._config  # OpenAICompatibleService stores _config
+        cfg = svc._config
         result = probe_judge(cfg)
         results[judge_name] = result.ok
-
-        from app.services.judge_config import _mask_key
-        masked = _mask_key(cfg.api_key)
         label = f"  pre-flight [{judge_name}]"
         if result.ok:
             click.secho(f"{label:<40} OK  ({result.message})", fg="green")
@@ -271,7 +274,7 @@ def _probe_judges(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Per-judge benchmark runner
+# Per-judge benchmark runner (shared by text + local_judge stages)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_benchmark_for_judge(
@@ -283,12 +286,6 @@ def run_benchmark_for_judge(
     seed: int,
     secrets: list[str],
 ) -> JudgeRunResult:
-    """Run all audit tests for one judge. Returns a JudgeRunResult.
-
-    Aborts the judge (returns status=failed) if:
-    - A non-retryable error occurs (401/403/404 / ValueError / PermissionError / LookupError)
-    - The same call fails _MAX_CONSECUTIVE_FAILURES times in a row
-    """
     from app.audit.tests.content_sensitivity import ContentSensitivityTest
     from app.audit.tests.delivery_invariance import DeliveryInvarianceTest
     from app.audit.tests.paraphrase_stability import ParaphraseStabilityTest
@@ -302,6 +299,7 @@ def run_benchmark_for_judge(
     from app.services.llm import get_paraphrase_service
     from app.services.judge_config import mask_secrets_in_text
     from app.services.stt import MockSTTService
+    from app.utils.memory import MemoryTracker
 
     settings = get_settings()
     content_engine = ContentEngine(llm=llm_service, db=None)
@@ -311,14 +309,13 @@ def run_benchmark_for_judge(
     try:
         para_service = get_paraphrase_service()
     except Exception:
-        para_service = llm_service  # mock fallback only
+        para_service = llm_service
 
     rows: list[BenchmarkRow] = []
     consecutive_failures = 0
 
     def _is_fatal(exc: Exception) -> bool:
-        """Non-retryable exceptions — abort immediately."""
-        return isinstance(exc, (PermissionError, LookupError, ValueError))
+        return isinstance(exc, (PermissionError, LookupError)) and not isinstance(exc, json.JSONDecodeError)
 
     def _safe_msg(exc: Exception) -> str:
         return mask_secrets_in_text(str(exc), secrets)[:200]
@@ -339,7 +336,6 @@ def run_benchmark_for_judge(
         ))
 
     def _call(fn, label: str):
-        """Execute fn(), track failures, abort judge on fatal error or too many retries."""
         nonlocal consecutive_failures
         try:
             result = fn()
@@ -354,8 +350,8 @@ def run_benchmark_for_judge(
                 )
             if consecutive_failures >= _MAX_CONSECUTIVE_FAILURES:
                 raise RuntimeError(
-                    f"Judge aborted after {_MAX_CONSECUTIVE_FAILURES} consecutive "
-                    f"failures on {label}: {safe}"
+                    f"Judge aborted after {_MAX_CONSECUTIVE_FAILURES} "
+                    f"consecutive failures on {label}: {safe}"
                 )
             click.echo(f"      [warn] {label}: {safe}")
             return None
@@ -382,7 +378,6 @@ def run_benchmark_for_judge(
             stt_result = stt_mock.transcribe("synthetic")
             words = stt_result.words
 
-            # ── Baseline: holistic ────────────────────────────────────────────
             def _holistic():
                 h = HolisticEvaluator(llm=llm_service).evaluate(
                     item.answer_text, item.question_text
@@ -391,7 +386,6 @@ def run_benchmark_for_judge(
                      {"reasoning": h.reasoning})
             _call(_holistic, "baseline_holistic")
 
-            # ── Baseline: rubric ──────────────────────────────────────────────
             def _rubric():
                 c_result = content_engine.analyze(
                     transcript_text=item.answer_text,
@@ -399,11 +393,8 @@ def run_benchmark_for_judge(
                     rubric_criteria=rubric_criteria,
                 )
                 _add("baseline_rubric", "rubric_score", c_result.overall_score, True, 0.0)
-            res = _call(_rubric, "baseline_rubric")
-            if res is None and consecutive_failures >= _MAX_CONSECUTIVE_FAILURES:
-                raise RuntimeError("Aborted after baseline_rubric failures")
+            _call(_rubric, "baseline_rubric")
 
-            # ── Test 1: Delivery Invariance ───────────────────────────────────
             def _di():
                 variants = [
                     generator.filler_injection(words, filler_rate=0.10),
@@ -420,7 +411,6 @@ def run_benchmark_for_judge(
                      di.passed, di.threshold, di.details)
             _call(_di, "delivery_invariance")
 
-            # ── Test 2: Content Sensitivity ───────────────────────────────────
             def _cs():
                 concepts = [c.expected_concepts[0]
                             for c in rubric_criteria if c.expected_concepts][:3]
@@ -439,7 +429,6 @@ def run_benchmark_for_judge(
                      cs.passed, cs.threshold, cs.details)
             _call(_cs, "content_sensitivity")
 
-            # ── Test 3: Paraphrase Stability ──────────────────────────────────
             def _ps():
                 para_v = generator.paraphrase(
                     item.answer_text, words, llm_service=para_service
@@ -454,7 +443,6 @@ def run_benchmark_for_judge(
                      ps.passed, ps.threshold, ps.details)
             _call(_ps, "paraphrase_stability")
 
-            # ── Test 4: Repeated Run ──────────────────────────────────────────
             def _rr():
                 rr = RepeatedRunTest(
                     content_engine,
@@ -467,7 +455,6 @@ def run_benchmark_for_judge(
                      rr.passed, rr.threshold, rr.details)
             _call(_rr, "repeated_run")
 
-            # ── Test 5: STT Sensitivity ───────────────────────────────────────
             if item.gold_transcript and item.audio_path:
                 def _stt():
                     w_result = MockSTTService(
@@ -484,13 +471,12 @@ def run_benchmark_for_judge(
                          st.passed, st.threshold, st.details)
                 _call(_stt, "stt_sensitivity")
 
-            # ── Ablation: content + delivery features ─────────────────────────
             def _ablation():
-                delivery_result = delivery_engine.analyze(words)
+                dr = delivery_engine.analyze(words)
                 delivery_features = {
-                    "speaking_rate_wpm": delivery_result.speaking_rate_wpm,
-                    "filler_density": delivery_result.filler_density,
-                    "pause_count": delivery_result.pause_count,
+                    "speaking_rate_wpm": dr.speaking_rate_wpm,
+                    "filler_density": dr.filler_density,
+                    "pause_count": dr.pause_count,
                 }
                 import app.config as _cfg
                 _orig = _cfg._settings.content_engine_include_delivery
@@ -534,19 +520,19 @@ def write_outputs(
     out_dir: Path,
     config: dict,
     judge_results: list[JudgeRunResult],
-) -> None:
+) -> dict:
+    """Write CSV, summary.json, plots. Returns summary dict."""
     import pandas as pd
-    from app.analysis.plots import (
-        plot_audit_summary, plot_model_comparison,
-        plot_repeatability, plot_score_deltas,
-    )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "config.json").write_text(json.dumps(config, indent=2))
 
+    summary: dict = {"per_test": {}, "per_judge": {}}
+
     if not rows:
         click.echo("  (no rows to write — all judges failed)")
-        return
+        (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
+        return summary
 
     fieldnames = list(BenchmarkRow.__dataclass_fields__.keys())
     with open(out_dir / "results.csv", "w", newline="", encoding="utf-8") as f:
@@ -557,7 +543,6 @@ def write_outputs(
 
     df = pd.DataFrame([asdict(r) for r in rows])
 
-    summary: dict = {"per_test": {}, "per_judge": {}}
     for test_name, grp in df.groupby("test_name"):
         summary["per_test"][test_name] = {
             "pass_rate": float(grp["passed"].mean()),
@@ -573,7 +558,6 @@ def write_outputs(
             "mean_metric": float(grp["metric_value"].mean()),
         }
 
-    # Add failed judges to summary
     failed = [jr for jr in judge_results if jr.status == "failed"]
     if failed:
         summary["failed_judges"] = [
@@ -583,27 +567,50 @@ def write_outputs(
 
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 
-    # Plots (best-effort)
+    # Plots — best-effort, skip if matplotlib not available
     try:
-        delta_df = df[df["test_name"] == "delivery_invariance"][["judge_name", "metric_value"]].copy()
-        delta_df.columns = ["variant_type", "delta"]
-        if not delta_df.empty:
-            plot_score_deltas(delta_df, out_dir)
+        from app.analysis.plots import (
+            plot_audit_summary, plot_model_comparison,
+            plot_repeatability, plot_score_deltas,
+        )
+        _make_plots(df, out_dir, summary)
+    except Exception as e:
+        click.echo(f"  [warn] plots skipped: {e}")
+
+    click.echo(f"  ✓ Results  : {out_dir}/results.csv")
+    click.echo(f"  ✓ Summary  : {out_dir}/summary.json")
+    click.echo(f"  ✓ Config   : {out_dir}/config.json")
+
+    return summary
+
+
+def _make_plots(df, out_dir, summary):
+    from app.analysis.plots import (
+        plot_audit_summary, plot_model_comparison,
+        plot_repeatability, plot_score_deltas,
+    )
+    import pandas as pd
+
+    try:
+        ddf = df[df["test_name"] == "delivery_invariance"][["judge_name", "metric_value"]].copy()
+        ddf.columns = ["variant_type", "delta"]
+        if not ddf.empty:
+            plot_score_deltas(ddf, out_dir)
     except Exception:
         pass
     try:
-        rr_df = df[df["test_name"] == "repeated_run"]
-        if not rr_df.empty:
-            scores_list = json.loads(rr_df.iloc[0]["details"]).get("scores", [])
-            if scores_list:
-                plot_repeatability(scores_list, out_dir)
+        rdf = df[df["test_name"] == "repeated_run"]
+        if not rdf.empty:
+            scores = json.loads(rdf.iloc[0]["details"]).get("scores", [])
+            if scores:
+                plot_repeatability(scores, out_dir)
     except Exception:
         pass
     try:
-        baseline_df = df[df["test_name"] == "baseline_rubric"][["judge_name", "metric_value"]].copy()
-        baseline_df.columns = ["model", "overall_score"]
-        if not baseline_df.empty:
-            plot_model_comparison(baseline_df, out_dir)
+        bdf = df[df["test_name"] == "baseline_rubric"][["judge_name", "metric_value"]].copy()
+        bdf.columns = ["model", "overall_score"]
+        if not bdf.empty:
+            plot_model_comparison(bdf, out_dir)
     except Exception:
         pass
     try:
@@ -611,188 +618,58 @@ def write_outputs(
             "delivery_invariance", "content_sensitivity",
             "paraphrase_stability", "repeated_run", "stt_sensitivity",
         ]
-        audit_vals, audit_thresh = {}, {}
+        av, at = {}, {}
         for t in audit_tests:
             sub = df[df["test_name"] == t]
             if not sub.empty:
-                audit_vals[t] = float(sub["metric_value"].mean())
-                audit_thresh[t] = float(sub["threshold"].iloc[0])
-        if audit_vals:
-            plot_audit_summary(audit_vals, audit_thresh, out_dir)
+                av[t] = float(sub["metric_value"].mean())
+                at[t] = float(sub["threshold"].iloc[0])
+        if av:
+            plot_audit_summary(av, at, out_dir)
     except Exception:
         pass
 
-    click.echo(f"\n  ✓ Results : {out_dir}/results.csv")
-    click.echo(f"  ✓ Summary : {out_dir}/summary.json")
-    click.echo(f"  ✓ Config  : {out_dir}/config.json")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CLI
+# Stage implementations
 # ─────────────────────────────────────────────────────────────────────────────
 
-@click.command()
-@click.option("--answers-dir", required=True, type=click.Path(exists=True))
-@click.option("--judges", default="all", show_default=True,
-              help="'all', 'mock', 'debug', or comma-separated judge names")
-@click.option("--runs", default=5, show_default=True)
-@click.option("--output-dir", default="experiments", show_default=True)
-@click.option("--seed", default=42, show_default=True)
-@click.option(
-    "--tag", default="pilot",
-    type=click.Choice(["debug", "mock", "pilot", "final"], case_sensitive=False),
-    show_default=True,
-    help="debug=not logged; mock=mock only; pilot=real/exploratory; final=clean tree required",
-)
-@click.option("--delivery-invariance-max", default=None, type=float)
-@click.option("--content-sensitivity-min", default=None, type=float)
-@click.option("--paraphrase-max-deviation", default=None, type=float)
-@click.option("--skip-preflight", is_flag=True,
-              help="Skip the pre-flight judge connectivity check (not recommended)")
-def main(
-    answers_dir: str,
-    judges: str,
-    runs: int,
-    output_dir: str,
+def stage_text(
+    items: list[AnswerItem],
+    judge_services: list[tuple[str, object]],
+    run_id: str,
+    out_dir: Path,
+    settings_override: dict,
     seed: int,
-    tag: str,
-    delivery_invariance_max: float | None,
-    content_sensitivity_min: float | None,
-    paraphrase_max_deviation: float | None,
     skip_preflight: bool,
-) -> None:
-    """Run counterfactual audit benchmark. Keys are never printed or logged."""
+    secrets: list[str],
+    config_snapshot: dict,
+) -> tuple[list[JudgeRunResult], dict]:
+    """Hosted judges over HTTP. No Whisper/Ollama loaded."""
+    from app.utils.memory import MemoryTracker, warn_if_low
     from app.config import get_settings
-    from app.services.judge_config import get_judge_registry, mask_secrets_in_text
 
     settings = get_settings()
+    warn_if_low("text", settings.memory_warn_below_gb)
 
-    # ── Tag: final requires clean tree ────────────────────────────────────────
-    if tag == "final" and _git_dirty():
-        click.secho(
-            "\nERROR: Working tree has uncommitted changes.\n"
-            "Final runs require a clean git working tree.\n"
-            "  git status          → see what is uncommitted\n"
-            "  git add . && git commit -m 'pre-final-run state'",
-            fg="red", bold=True,
-        )
-        raise SystemExit(1)
+    tracker = MemoryTracker("text", out_dir)
+    tracker.start()
 
-    # ── Tag: mock forces mock provider ───────────────────────────────────────
-    if tag == "mock":
-        os.environ["LLM_PROVIDER"] = "mock"
-
-    # ── Debug tag note ────────────────────────────────────────────────────────
-    if tag == "debug":
-        click.secho("  [debug] This run will NOT be logged to experiments.md.", fg="yellow")
-
-    run_id = (
-        f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
-        f"_{tag}"
-        f"_{uuid.uuid4().hex[:8]}"
-    )
-
-    click.echo(f"\nInterviewIQ Audit Benchmark")
-    click.echo(f"  run_id   : {run_id}")
-    click.echo(f"  tag      : {tag}")
-    click.echo(f"  answers  : {answers_dir}")
-    click.echo(f"  judges   : {judges}")
-    click.echo(f"  runs     : {runs}")
-    click.echo(f"  seed     : {seed}")
-
-    # ── Resolve judges ────────────────────────────────────────────────────────
-    try:
-        judge_services = resolve_judges(judges)
-    except Exception as exc:
-        click.secho(str(exc), fg="red")
-        raise SystemExit(1)
-
-    click.echo(f"  resolved : {[n for n, _ in judge_services]}\n")
-
-    # ── Load items ────────────────────────────────────────────────────────────
-    answers_path = Path(answers_dir)
-    items = load_answer_items(answers_path)
-    if not items:
-        click.secho("No valid answer items found.", fg="red")
-        raise SystemExit(1)
-    click.echo(f"  items    : {len(items)}\n")
-
-    # ── Collect secrets for masking ───────────────────────────────────────────
-    try:
-        registry = get_judge_registry()
-        secrets = registry.all_secrets()
-    except Exception:
-        secrets = []
-
-    # ── Pre-flight check ──────────────────────────────────────────────────────
-    if not skip_preflight and tag not in ("mock", "debug"):
-        click.echo("Pre-flight connectivity check:")
+    # Pre-flight
+    if not skip_preflight:
+        click.echo("\nPre-flight connectivity check:")
         probe_results = _probe_judges(judge_services, secrets)
         failed_preflight = [n for n, ok in probe_results.items() if not ok]
         if failed_preflight:
             click.secho(
                 f"\n  Pre-flight FAILED for: {failed_preflight}\n"
-                "  Fix these judges before running the benchmark.\n"
-                "  Run `python check_config.py` for details.\n"
-                "  Use --skip-preflight to bypass (not recommended).",
+                "  Fix these judges or use --skip-preflight.",
                 fg="red", bold=True,
             )
+            tracker.finish()
             raise SystemExit(1)
         click.echo("  All judges reachable.\n")
 
-    # ── Settings overrides ────────────────────────────────────────────────────
-    settings_override: dict = {"repeated_runs": runs}
-    if delivery_invariance_max is not None:
-        settings_override["delivery_invariance_max"] = delivery_invariance_max
-    if content_sensitivity_min is not None:
-        settings_override["content_sensitivity_min"] = content_sensitivity_min
-    if paraphrase_max_deviation is not None:
-        settings_override["paraphrase_max_deviation"] = paraphrase_max_deviation
-
-    # ── Build config snapshot (NO keys) ──────────────────────────────────────
-    try:
-        judges_safe = [j.safe_info() for j in registry.judges
-                       if j.name in {n for n, _ in judge_services}]
-        paraphrase_safe = registry.paraphrase.safe_info() if registry.paraphrase else None
-    except Exception:
-        judges_safe = [{"name": n, "model": svc.model_name, "provider": svc.provider}
-                       for n, svc in judge_services]
-        paraphrase_safe = None
-
-    git_hash = _git_hash()
-    pip_packages = _pip_freeze()
-
-    config_snapshot: dict = {
-        "run_id": run_id,
-        "tag": tag,
-        "status": "running",        # updated to ok/partial/failed at end
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "git_commit": git_hash,
-        "answers_dir": str(answers_path.resolve()),
-        "judges": judges_safe,
-        "paraphrase": paraphrase_safe,
-        "seed": seed,
-        "n_items": len(items),
-        "settings_override": settings_override,
-        "base_settings": {
-            "whisper_model_size": settings.whisper_model_size,
-            "audit_delivery_invariance_max": settings.audit_delivery_invariance_max,
-            "audit_content_sensitivity_min": settings.audit_content_sensitivity_min,
-            "audit_paraphrase_max_deviation": settings.audit_paraphrase_max_deviation,
-            "audit_repeatability_max_variance": settings.audit_repeatability_max_variance,
-            "audit_stt_max_drift": settings.audit_stt_max_drift,
-            "content_engine_prompt_version": settings.content_engine_prompt_version,
-        },
-        "pip_freeze": pip_packages,
-        # API keys are NEVER included here
-    }
-
-    # Write config early so it exists even if the run crashes
-    out_dir = Path(output_dir) / run_id
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "config.json").write_text(json.dumps(config_snapshot, indent=2))
-
-    # ── Run benchmark per judge ───────────────────────────────────────────────
     all_rows: list[BenchmarkRow] = []
     judge_results: list[JudgeRunResult] = []
 
@@ -810,82 +687,463 @@ def main(
         judge_results.append(result)
         if result.status == "ok":
             all_rows.extend(result.rows)
+        tracker.update_peak()
 
-    # ── Determine run status ──────────────────────────────────────────────────
-    failed_judges = [jr for jr in judge_results if jr.status == "failed"]
-    ok_judges = [jr for jr in judge_results if jr.status == "ok"]
+    mem = tracker.finish()
+    click.echo(
+        f"\n  Memory: RSS {mem['rss_start_mb']:.0f}→{mem['rss_end_mb']:.0f} MB "
+        f"(peak {mem['rss_peak_mb']:.0f} MB)"
+    )
 
-    if not ok_judges:
-        run_status = "failed"
-    elif failed_judges:
-        run_status = "partial"
+    summary = write_outputs(all_rows, out_dir, config_snapshot, judge_results)
+    return judge_results, summary
+
+
+def stage_local_judge(
+    items: list[AnswerItem],
+    run_id: str,
+    out_dir: Path,
+    settings_override: dict,
+    seed: int,
+    secrets: list[str],
+    config_snapshot: dict,
+) -> tuple[list[JudgeRunResult], dict]:
+    """Ollama local judge only. Enforces OLLAMA_NUM_PARALLEL=1."""
+    from app.utils.memory import MemoryTracker, warn_if_low
+    from app.services.llm import get_ollama_service
+    from app.config import get_settings
+
+    settings = get_settings()
+    warn_if_low("local_judge", settings.memory_warn_below_gb)
+
+    os.environ["OLLAMA_NUM_PARALLEL"] = "1"
+    click.echo("  OLLAMA_NUM_PARALLEL=1 enforced.")
+
+    tracker = MemoryTracker("local_judge", out_dir)
+    tracker.start()
+
+    svc = get_ollama_service()
+    click.echo(f"\n  ── Ollama: {svc.model_name}  (ctx={settings.ollama_num_ctx})")
+
+    result = run_benchmark_for_judge(
+        items=items,
+        judge_name="judge_ollama",
+        llm_service=svc,
+        run_id=run_id,
+        settings_override=settings_override,
+        seed=seed,
+        secrets=secrets,
+    )
+    tracker.update_peak()
+
+    mem = tracker.finish()
+    click.echo(
+        f"\n  Memory: RSS {mem['rss_start_mb']:.0f}→{mem['rss_end_mb']:.0f} MB "
+        f"(peak {mem['rss_peak_mb']:.0f} MB)"
+    )
+
+    all_rows = result.rows if result.status == "ok" else []
+    summary = write_outputs(all_rows, out_dir, config_snapshot, [result])
+    return [result], summary
+
+
+def stage_audio(
+    items: list[AnswerItem],
+    run_id: str,
+    out_dir: Path,
+    config_snapshot: dict,
+) -> None:
+    """TTS + Whisper only. Refuses if Ollama is running."""
+    import httpx
+    from app.utils.memory import MemoryTracker, warn_if_low
+    from app.config import get_settings
+
+    settings = get_settings()
+    warn_if_low("audio", settings.memory_warn_below_gb)
+
+    # Guard: refuse if Ollama is serving (would double RAM)
+    try:
+        r = httpx.get(f"{settings.ollama_base_url}/api/tags", timeout=2.0)
+        if r.status_code == 200:
+            models = r.json().get("models", [])
+            if models:
+                click.secho(
+                    f"\n  ERROR: Ollama is running with {len(models)} model(s) loaded.\n"
+                    "  The audio stage loads Whisper and should not run alongside Ollama.\n"
+                    "  Stop Ollama first: close the Ollama app or kill the process.\n",
+                    fg="red", bold=True,
+                )
+                raise SystemExit(1)
+    except (httpx.ConnectError, httpx.TimeoutException):
+        pass  # Ollama not running — safe to proceed
+
+    tracker = MemoryTracker("audio", out_dir)
+    tracker.start()
+
+    audio_dir = out_dir / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    results = []
+
+    for item in items:
+        if item.audio_path and Path(item.audio_path).exists():
+            click.echo(f"  Transcribing existing audio: {item.audio_path}")
+        else:
+            click.echo(f"  [skip] {item.item_id}: no audio.wav — skipping audio stage")
+            continue
+
+        # Lazy-load Whisper
+        try:
+            from faster_whisper import WhisperModel  # type: ignore
+            model = WhisperModel(
+                settings.whisper_model_size,
+                device=settings.whisper_device,
+                compute_type=settings.whisper_compute_type,
+            )
+            segments, info = model.transcribe(item.audio_path, word_timestamps=True)
+            text = " ".join(seg.text.strip() for seg in segments)
+            result_rec = {"item_id": item.item_id, "transcript": text, "language": info.language}
+            results.append(result_rec)
+            click.echo(f"    → {text[:80]}")
+        except ImportError:
+            click.secho("  faster-whisper not installed. Run: pip install faster-whisper", fg="red")
+            break
+        except Exception as exc:
+            click.echo(f"  [warn] {item.item_id}: {exc}")
+        finally:
+            # Unload model and free RAM
+            try:
+                del model
+            except NameError:
+                pass
+            gc.collect()
+            tracker.update_peak()
+
+    tracker.update_peak()
+    mem = tracker.finish()
+
+    (out_dir / "audio_transcripts.json").write_text(json.dumps(results, indent=2))
+    click.echo(
+        f"\n  ✓ Audio transcripts: {out_dir}/audio_transcripts.json\n"
+        f"  Memory: RSS {mem['rss_start_mb']:.0f}→{mem['rss_end_mb']:.0f} MB "
+        f"(peak {mem['rss_peak_mb']:.0f} MB)"
+    )
+
+
+def stage_analysis(run_id: str | None, output_dir: Path) -> None:
+    """Read saved results and regenerate plots + summary. Pandas only."""
+    import pandas as pd
+    from app.utils.memory import MemoryTracker, warn_if_low
+    from app.config import get_settings
+    from app.analysis.plots import (
+        plot_audit_summary, plot_model_comparison,
+        plot_repeatability, plot_score_deltas,
+    )
+
+    settings = get_settings()
+    warn_if_low("analysis", settings.memory_warn_below_gb)
+
+    # Find run dir
+    if run_id:
+        run_dir = output_dir / run_id
     else:
-        run_status = "ok"
+        # Latest run
+        dirs = sorted(
+            [d for d in output_dir.iterdir() if d.is_dir() and not d.name.startswith(".")],
+            key=lambda d: d.stat().st_mtime,
+            reverse=True,
+        )
+        if not dirs:
+            click.secho("No experiment runs found.", fg="red")
+            raise SystemExit(1)
+        run_dir = dirs[0]
+        click.echo(f"  Using latest run: {run_dir.name}")
 
-    # Update config with final status and failure details
+    results_csv = run_dir / "results.csv"
+    if not results_csv.exists():
+        click.secho(f"  No results.csv in {run_dir}", fg="red")
+        raise SystemExit(1)
+
+    tracker = MemoryTracker("analysis", run_dir)
+    tracker.start()
+
+    df = pd.read_csv(results_csv)
+    click.echo(f"  Loaded {len(df)} rows from {results_csv}")
+
+    _make_plots(df, run_dir, {})
+
+    mem = tracker.finish()
+    click.echo(
+        f"  ✓ Plots regenerated in {run_dir}/\n"
+        f"  Memory: RSS {mem['rss_start_mb']:.0f}→{mem['rss_end_mb']:.0f} MB "
+        f"(peak {mem['rss_peak_mb']:.0f} MB)"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+@click.command()
+@click.option("--answers-dir", default="data/benchmark_answers", show_default=True,
+              type=click.Path())
+@click.option(
+    "--stage",
+    type=click.Choice(["text", "local_judge", "audio", "analysis"], case_sensitive=False),
+    default="text", show_default=True,
+    help="text=hosted judges; local_judge=Ollama; audio=Whisper; analysis=plots only",
+)
+@click.option("--judges", default="all", show_default=True,
+              help="For --stage text: 'all', 'mock', or comma-separated judge names")
+@click.option("--runs", default=3, show_default=True,
+              help="Repeated runs for consistency test")
+@click.option("--output-dir", default="experiments", show_default=True)
+@click.option("--seed", default=42, show_default=True)
+@click.option(
+    "--tag", default="pilot",
+    type=click.Choice(["debug", "mock", "pilot", "final"], case_sensitive=False),
+    show_default=True,
+)
+@click.option("--run-id", default=None,
+              help="For --stage analysis: run_id to re-analyse (default: latest)")
+@click.option("--delivery-invariance-max", default=None, type=float)
+@click.option("--content-sensitivity-min", default=None, type=float)
+@click.option("--paraphrase-max-deviation", default=None, type=float)
+@click.option("--skip-preflight", is_flag=True)
+def main(
+    answers_dir: str,
+    stage: str,
+    judges: str,
+    runs: int,
+    output_dir: str,
+    seed: int,
+    tag: str,
+    run_id: str | None,
+    delivery_invariance_max: float | None,
+    content_sensitivity_min: float | None,
+    paraphrase_max_deviation: float | None,
+    skip_preflight: bool,
+) -> None:
+    """InterviewIQ research benchmark. Keys are never printed or logged."""
+    from app.config import get_settings
+    from app.services.judge_config import get_judge_registry, mask_secrets_in_text
+    from app.utils.memory import warn_if_low
+
+    settings = get_settings()
+
+    # ── analysis stage doesn't need items or judges ───────────────────────────
+    if stage == "analysis":
+        stage_analysis(run_id=run_id, output_dir=Path(output_dir))
+        return
+
+    # ── guards ────────────────────────────────────────────────────────────────
+    if tag == "final" and _git_dirty():
+        click.secho(
+            "\nERROR: Working tree has uncommitted changes.\n"
+            "Final runs require a clean git working tree.",
+            fg="red", bold=True,
+        )
+        raise SystemExit(1)
+
+    if tag in ("mock", "debug") or stage == "local_judge":
+        if tag == "mock":
+            os.environ["LLM_PROVIDER"] = "mock"
+    if tag == "debug":
+        click.secho("  [debug] This run will NOT be logged to experiments.md.", fg="yellow")
+
+    # ── build run_id ──────────────────────────────────────────────────────────
+    computed_run_id = (
+        f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+        f"_{tag}_{stage}_{uuid.uuid4().hex[:8]}"
+    )
+
+    click.echo(f"\nInterviewIQ Audit Benchmark")
+    click.echo(f"  run_id   : {computed_run_id}")
+    click.echo(f"  stage    : {stage}")
+    click.echo(f"  tag      : {tag}")
+    click.echo(f"  seed     : {seed}")
+
+    # ── load items ────────────────────────────────────────────────────────────
+    answers_path = Path(answers_dir)
+    if not answers_path.exists():
+        click.secho(f"answers-dir not found: {answers_dir}", fg="red")
+        raise SystemExit(1)
+
+    items = load_answer_items(answers_path)
+    if not items:
+        click.secho("No valid answer items found.", fg="red")
+        raise SystemExit(1)
+    click.echo(f"  items    : {len(items)}")
+
+    # ── secrets for masking ───────────────────────────────────────────────────
+    try:
+        registry = get_judge_registry()
+        secrets = registry.all_secrets()
+    except Exception:
+        secrets = []
+
+    # ── settings overrides ────────────────────────────────────────────────────
+    settings_override: dict = {"repeated_runs": runs}
+    if delivery_invariance_max is not None:
+        settings_override["delivery_invariance_max"] = delivery_invariance_max
+    if content_sensitivity_min is not None:
+        settings_override["content_sensitivity_min"] = content_sensitivity_min
+    if paraphrase_max_deviation is not None:
+        settings_override["paraphrase_max_deviation"] = paraphrase_max_deviation
+
+    # ── config snapshot ───────────────────────────────────────────────────────
+    git_hash = _git_hash()
+
+    try:
+        selected_judge_names = (
+            [n for n, _ in resolve_judges(judges)]
+            if stage != "local_judge" else [f"ollama/{settings.ollama_model}"]
+        )
+        judges_safe = [
+            j.safe_info() for j in registry.judges
+            if j.name in set(selected_judge_names)
+        ] if stage != "local_judge" else [
+            {"name": "judge_ollama", "model": settings.ollama_model,
+             "provider": "ollama", "base_url": settings.ollama_base_url}
+        ]
+        paraphrase_safe = registry.paraphrase.safe_info() if registry.paraphrase else None
+    except Exception:
+        judges_safe = []
+        paraphrase_safe = None
+
+    config_snapshot: dict = {
+        "run_id": computed_run_id,
+        "tag": tag,
+        "stage": stage,
+        "status": "running",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "git_commit": git_hash,
+        "answers_dir": str(answers_path.resolve()),
+        "judges": judges_safe,
+        "paraphrase": paraphrase_safe,
+        "seed": seed,
+        "n_items": len(items),
+        "settings_override": settings_override,
+        "base_settings": {
+            "whisper_model_size": settings.whisper_model_size,
+            "audit_delivery_invariance_max": settings.audit_delivery_invariance_max,
+            "audit_content_sensitivity_min": settings.audit_content_sensitivity_min,
+            "audit_paraphrase_max_deviation": settings.audit_paraphrase_max_deviation,
+            "audit_repeatability_max_variance": settings.audit_repeatability_max_variance,
+            "audit_stt_max_drift": settings.audit_stt_max_drift,
+            "content_engine_prompt_version": settings.content_engine_prompt_version,
+            "ollama_model": settings.ollama_model,
+            "ollama_num_ctx": settings.ollama_num_ctx,
+        },
+        "pip_freeze": _pip_freeze(),
+        # API keys are NEVER included
+    }
+
+    out_dir = Path(output_dir) / computed_run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "config.json").write_text(json.dumps(config_snapshot, indent=2))
+
+    # ── dispatch to stage ─────────────────────────────────────────────────────
+    judge_results: list[JudgeRunResult] = []
+    summary: dict = {}
+
+    if stage == "text":
+        try:
+            judge_services = resolve_judges(judges)
+        except Exception as exc:
+            click.secho(str(exc), fg="red")
+            raise SystemExit(1)
+        click.echo(f"  judges   : {[n for n, _ in judge_services]}\n")
+
+        judge_results, summary = stage_text(
+            items=items,
+            judge_services=judge_services,
+            run_id=computed_run_id,
+            out_dir=out_dir,
+            settings_override=settings_override,
+            seed=seed,
+            skip_preflight=skip_preflight,
+            secrets=secrets,
+            config_snapshot=config_snapshot,
+        )
+
+    elif stage == "local_judge":
+        judge_results, summary = stage_local_judge(
+            items=items,
+            run_id=computed_run_id,
+            out_dir=out_dir,
+            settings_override=settings_override,
+            seed=seed,
+            secrets=secrets,
+            config_snapshot=config_snapshot,
+        )
+
+    elif stage == "audio":
+        stage_audio(
+            items=items,
+            run_id=computed_run_id,
+            out_dir=out_dir,
+            config_snapshot=config_snapshot,
+        )
+        # audio stage doesn't produce BenchmarkRows
+        config_snapshot["status"] = "ok"
+        (out_dir / "config.json").write_text(json.dumps(config_snapshot, indent=2))
+        click.echo(f"\nRun ID : {computed_run_id}")
+        return
+
+    # ── finalise status ───────────────────────────────────────────────────────
+    failed_judges = [jr for jr in judge_results if jr.status == "failed"]
+    ok_judges     = [jr for jr in judge_results if jr.status == "ok"]
+
+    run_status = "failed" if not ok_judges else ("partial" if failed_judges else "ok")
     config_snapshot["status"] = run_status
     if failed_judges:
         config_snapshot["failed_judges"] = [
-            {"judge_name": jr.judge_name, "model": jr.judge_model, "reason": jr.failure_reason}
+            {"judge_name": jr.judge_name, "model": jr.judge_model,
+             "reason": jr.failure_reason}
             for jr in failed_judges
         ]
     (out_dir / "config.json").write_text(json.dumps(config_snapshot, indent=2))
 
-    # ── Write outputs ─────────────────────────────────────────────────────────
-    write_outputs(all_rows, out_dir, config_snapshot, judge_results)
-
-    # ── Log to experiments.md (skip for debug runs) ───────────────────────────
+    # ── log to experiments.md (never for debug) ───────────────────────────────
     if tag != "debug":
-        import pandas as pd
-        summary_for_log: dict = {"per_test": {}}
-        if all_rows:
-            df_s = pd.DataFrame([asdict(r) for r in all_rows])
-            for test_name, grp in df_s.groupby("test_name"):
-                summary_for_log["per_test"][test_name] = {
-                    "pass_rate": float(grp["passed"].mean()),
-                }
         _append_to_experiments_log(
-            run_id=run_id,
+            run_id=computed_run_id,
             tag=tag,
-            judge_names=[n for n, _ in judge_services],
+            judge_names=[jr.judge_name for jr in judge_results],
             n_items=len(items),
             prompt_version=settings.content_engine_prompt_version,
             git_hash=git_hash,
-            summary=summary_for_log,
+            summary=summary,
             run_status=run_status,
             failed_judges=[jr.judge_name for jr in failed_judges],
+            stage=stage,
         )
         click.echo(f"  ✓ Logged to : docs/experiments.md  (status={run_status})")
     else:
         click.echo("  [debug] Not logged to experiments.md.")
 
-    # ── Summary table ─────────────────────────────────────────────────────────
+    # ── summary table ─────────────────────────────────────────────────────────
     import pandas as pd
-    click.echo("\n── Summary ────────────────────────────────────────────────")
+    all_rows = [r for jr in judge_results if jr.status == "ok" for r in jr.rows]
 
+    click.echo("\n── Summary ────────────────────────────────────────────────")
     if failed_judges:
         click.secho(
-            f"  Aborted judges ({len(failed_judges)}): "
-            + ", ".join(jr.judge_name for jr in failed_judges),
-            fg="red",
+            f"  Aborted: {', '.join(jr.judge_name for jr in failed_judges)}", fg="red"
         )
-
     if all_rows:
         df = pd.DataFrame([asdict(r) for r in all_rows])
-        for test_name, grp in df.groupby("test_name"):
-            pass_rate = grp["passed"].mean() * 100
-            mean_val = grp["metric_value"].mean()
-            status_icon = "✓" if pass_rate >= 80 else "✗"
-            click.echo(
-                f"  {status_icon} {test_name:<35}  pass={pass_rate:.0f}%  mean={mean_val:.4f}"
-            )
+        for tn, grp in df.groupby("test_name"):
+            pr = grp["passed"].mean() * 100
+            mv = grp["metric_value"].mean()
+            icon = "✓" if pr >= 80 else "✗"
+            click.echo(f"  {icon} {tn:<35}  pass={pr:.0f}%  mean={mv:.4f}")
 
     status_color = {"ok": "green", "partial": "yellow", "failed": "red"}[run_status]
     click.secho(f"\nRun status : {run_status.upper()}", fg=status_color, bold=True)
-    click.echo(f"Run ID     : {run_id}")
+    click.echo(f"Run ID     : {computed_run_id}")
     click.echo(f"Output     : {out_dir}/\n")
 
-    # Exit non-zero if the run fully failed (all judges aborted)
     if run_status == "failed":
         raise SystemExit(1)
 
