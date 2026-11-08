@@ -291,6 +291,7 @@ class ContentEngine:
         rubric_criteria: list[RubricCriterion],
         *,
         delivery_features: dict | None = None,
+        run_index: int | None = None,
     ) -> ContentResult:
         settings = get_settings()
         effective_delivery = (
@@ -306,7 +307,7 @@ class ContentEngine:
 
         pv = settings.content_engine_prompt_version
         llm_response, parsed, log_id = self._call_with_length_retry(
-            prompt, prompt_version=pv
+            prompt, prompt_version=pv, run_index=run_index
         )
 
         return self._build_result(
@@ -320,6 +321,8 @@ class ContentEngine:
         self,
         prompt: str,
         prompt_version: str,
+        *,
+        run_index: int | None = None,
     ) -> tuple[LLMResponse, ContentEvalOutput, int | None]:
         """Call LLM. On finish_reason==length, retry ONCE with doubled budget."""
         max_tokens = _DEFAULT_MAX_TOKENS
@@ -333,7 +336,8 @@ class ContentEngine:
             self.stats.record_call()
             try:
                 result = self._call_with_parse_retry(
-                    prompt, prompt_version=prompt_version, max_tokens=max_tokens
+                    prompt, prompt_version=prompt_version,
+                    max_tokens=max_tokens, run_index=run_index,
                 )
                 return result
             except TruncatedOutputError as exc:
@@ -360,6 +364,7 @@ class ContentEngine:
         *,
         prompt_version: str,
         max_tokens: int,
+        run_index: int | None = None,
     ) -> tuple[LLMResponse, ContentEvalOutput, int | None]:
         """Call LLM and parse JSON. Retries up to 3x on parse failures.
 
@@ -370,6 +375,7 @@ class ContentEngine:
             temperature=0.0,
             max_tokens=max_tokens,
             prompt_version=prompt_version,
+            run_index=run_index,
         )
         raw = llm_resp.text
 

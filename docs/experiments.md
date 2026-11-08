@@ -14,6 +14,7 @@ Format: `run_id | date | tag | judges | n_items | prompt_v | git_hash | di_pass%
 | 20261103T101739_pilot_c1450554 | 2026-11-03 | **pilot** | judge_nemotron/judge_nemotron_ultra | 3 | vv1 | `15afdff5` | 100% | 0% | 100% | 100% | 86% | |
 | 20261103T161326_pilot_text_498db2a2 | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
 | 20261103T162131_pilot_text_94a0c18b | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
-| 20261103T162824_pilot_text_82c8318b | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | 100% | 0% | 67% | 100% | 81% | **OK** |
+| 20261103T162824_pilot_text_82c8318b | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv1 | `5dc09eb0` | 100% | 0% | 67% | 100% | 81% | **OK** | ⚠️ cs_pass=0 is INVALID (no-op degradation artifact, see T-I-5). Other tests valid. |
 | 20261103T171150_pilot_text_91a4340e | 2026-11-03 | **pilot** | [text] judge_nemotron_ultra | 3 | vv2 | `58b7114d` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
+| 20261104T041837_pilot_text_cb0e6c66 | 2026-11-04 | **pilot** | [text] judge_nemotron_ultra | 3 | vv2 | `d2522aa0` | — | — | — | — | — | **FAILED** (failed: judge_nemotron_ultra) |
 <!-- EXPERIMENT_LOG_END — do not remove this line -->

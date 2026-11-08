@@ -1,0 +1,1 @@
+A stack is a Last In First Out structure where you push and pop from the top. A queue is First In First Out, where elements are added at the back and removed from the front.

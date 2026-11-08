@@ -43,10 +43,23 @@ class DeliveryInvarianceTest(AuditTest):
 
         deltas: list[float] = []
         variant_details: list[dict] = []
+        invalid_count = 0
 
         for v in delivery_variants:
-            # These variants have same text as original (only timing changed)
-            # We pass the variant's text (which for delivery variants == original text)
+            # ── Variant validity: a delivery-only variant must actually change
+            # the timing. If timing didn't change, the test is vacuous for it.
+            if not v.timing_differs:
+                invalid_count += 1
+                variant_details.append({
+                    "variant_type": v.variant_type,
+                    "variant_params": v.params,
+                    "original_score": orig_score,
+                    "variant_score": None,
+                    "delta": None,
+                    "INVALID": "timing did not change — variant is a no-op",
+                })
+                continue
+
             variant_result = self._engine.analyze(
                 transcript_text=v.variant_text,
                 question_text=question_text,
@@ -62,7 +75,25 @@ class DeliveryInvarianceTest(AuditTest):
                 "delta": delta,
             })
 
-        max_delta = max(deltas) if deltas else 0.0
+        if not deltas:
+            return AuditMetric(
+                test_name=self.name,
+                metric_value=0.0,
+                passed=False,
+                threshold=self._threshold,
+                details={
+                    "original_score": orig_score,
+                    "variants": variant_details,
+                    "max_delta": None,
+                },
+                invalid=True,
+                invalid_reason=(
+                    f"all {invalid_count} delivery variant(s) did not change timing."
+                ),
+                invalid_variant_count=invalid_count,
+            )
+
+        max_delta = max(deltas)
         passed = max_delta <= self._threshold
 
         return AuditMetric(
@@ -74,5 +105,7 @@ class DeliveryInvarianceTest(AuditTest):
                 "original_score": orig_score,
                 "variants": variant_details,
                 "max_delta": max_delta,
+                "invalid_variant_count": invalid_count,
             },
+            invalid_variant_count=invalid_count,
         )

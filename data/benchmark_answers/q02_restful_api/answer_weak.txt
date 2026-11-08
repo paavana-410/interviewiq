@@ -1,0 +1,1 @@
+A REST API is a database that stores user data. It uses SQL queries to send data and keeps a session on the server, and it only works with XML files.

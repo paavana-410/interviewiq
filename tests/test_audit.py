@@ -88,12 +88,22 @@ def test_delivery_invariance_detects_contamination(rubric, variant_generator, sa
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_paraphrase_stability(mock_engine, rubric, variant_generator, sample_words):
-    para_v = variant_generator.paraphrase(TRANSCRIPT, sample_words, llm_service=None)
+    # Use a multi-sentence transcript so the no-LLM paraphrase (sentence shuffle)
+    # actually changes the text — otherwise the validity check (correctly) marks
+    # a single-sentence paraphrase as a no-op.
+    multi = ("I have strong experience with OOP. I also know design patterns. "
+             "I have built several large projects.")
+    multi_words = variant_generator._fresh_rng  # unused; build words below
+    from app.services.stt import MockSTTService
+    w = MockSTTService(fixed_transcript=multi).transcribe("x").words
+    para_v = variant_generator.paraphrase(multi, w, llm_service=None)
+    assert para_v.text_differs, "precondition: paraphrase must differ from original"
     test = ParaphraseStabilityTest(mock_engine, threshold=0.5)
-    metric = test.run(TRANSCRIPT, QUESTION, rubric, [para_v])
+    metric = test.run(multi, QUESTION, rubric, [para_v])
     assert metric.test_name == "paraphrase_stability"
     assert isinstance(metric.metric_value, float)
     assert metric.passed  # mock returns same score
+    assert not metric.invalid
 
 
 def test_paraphrase_needs_human_verification(variant_generator, sample_words):
@@ -171,10 +181,15 @@ def test_combiner_all_pass(mock_engine, rubric, variant_generator, sample_words)
     filler_v = variant_generator.filler_injection(sample_words)
     di_test = DeliveryInvarianceTest(mock_engine, threshold=0.5)
     metrics.append(di_test.run(TRANSCRIPT, QUESTION, rubric, [filler_v]))
-    # Paraphrase
-    para_v = variant_generator.paraphrase(TRANSCRIPT, sample_words)
+    # Paraphrase — multi-sentence so the shuffle actually changes the text
+    from app.services.stt import MockSTTService
+    multi = ("I have strong experience with OOP. I also know design patterns. "
+             "I have built several large projects.")
+    mw = MockSTTService(fixed_transcript=multi).transcribe("x").words
+    para_v = variant_generator.paraphrase(multi, mw)
+    assert para_v.text_differs
     ps_test = ParaphraseStabilityTest(mock_engine, threshold=0.5)
-    metrics.append(ps_test.run(TRANSCRIPT, QUESTION, rubric, [para_v]))
+    metrics.append(ps_test.run(multi, QUESTION, rubric, [para_v]))
     # Repeated run
     rr_test = RepeatedRunTest(mock_engine, n_runs=3, threshold=0.5)
     metrics.append(rr_test.run(TRANSCRIPT, QUESTION, rubric))
@@ -247,13 +262,21 @@ def test_pause_insertion_shifts_timestamps(variant_generator, sample_words):
 
 
 def test_quality_degradation_changes_text(variant_generator, sample_words):
+    # Sentence-based degradation: use a multi-sentence text so the concept-
+    # carrying sentence can be removed while other sentences remain.
+    multi = ("I have strong experience with object-oriented programming. "
+             "I also know about design patterns. "
+             "I once worked on a web project for a class.")
+    from app.services.stt import MockSTTService
+    mw = MockSTTService(fixed_transcript=multi).transcribe("x").words
     variant = variant_generator.quality_degradation(
-        text=TRANSCRIPT,
-        words=sample_words,
+        text=multi,
+        words=mw,
         concepts_to_remove=["object-oriented", "design patterns"],
     )
+    assert variant.text_differs, "degraded text must differ from original"
     assert "object-oriented" not in variant.variant_text
-    assert variant.variant_text != TRANSCRIPT
+    assert variant.variant_text != multi
 
 
 def test_seeded_variants_are_reproducible(sample_words):

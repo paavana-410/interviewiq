@@ -27,6 +27,15 @@ Update as the project evolves.
 **Mitigation:** Prompt version is tracked in every call log and cache key. A future extension could test multiple prompt phrasings.
 **Status:** ⚠️ Acknowledged as a limitation.
 
+### T-I-5 — content_sensitivity = 0 on the v1 pilot run was a no-op degradation artifact
+**Threat:** On run `20261103T162824_pilot_text_82c8318b`, the content_sensitivity metric was 0.000 for all three items. The deep diagnostic (`diagnose_content_sensitivity.py --deep`) showed this was an artifact: the degradation used `text.replace(concept, ...)` with concept names (`LIFO`, `use cases`, `example`) that never appeared verbatim in the answer text, so the "degraded" text was byte-identical to the original. Both calls hit the same cache key and returned the same response. The metric therefore measured nothing.
+**Mitigation (applied):**
+- (a) `quality_degradation` now removes whole sentences (substring match or via an explicit `concept_sentences` rubric annotation) and uses hand-written `answer_medium.txt` / `answer_weak.txt` when present.
+- (b) Every audit test now validates that the variant actually differs from the original (text hash / timing hash). A no-op variant is marked `invalid` and EXCLUDED from the metric — never reported as 0. Invalid-variant counts are recorded per test in `summary.json`.
+- (c) The repeated-run test now bypasses the cache via a `run_index` in the cache key, so repeats are real calls (a unit test proves two repeats make two calls).
+**Status:** ✅ Fixed. Run `20261103T162824_pilot_text_82c8318b` is INVALID for the content_sensitivity test; its other four tests remain valid. Any paper claim about content sensitivity must come from a run on the fixed code.
+**Note for paper:** This is documented as a methods bug found and fixed during pilot testing, not a property of the judges. We do NOT claim the v1 judge was "insensitive" or that there was a "ceiling effect" — those were discarded hypotheses. The correct statement is: the degradation procedure was a no-op, so the test was uninformative on that run.
+
 ---
 
 ## External Validity

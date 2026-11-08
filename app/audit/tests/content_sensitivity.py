@@ -3,11 +3,13 @@
 Hypothesis: When answer quality degrades (key concepts removed), the content
 score MUST drop. Delivery metrics must remain unchanged.
 
-Metrics:
-  content_sensitivity = original_score - degraded_score  (should be > min threshold)
-  delivery_invariance_check = |delivery_metric_original - delivery_metric_degraded|
-                               (should be ~0)
+Metric: content_sensitivity = original_score - degraded_score  (should be >= min threshold)
 Pass condition: content drop >= threshold (default 0.15)
+
+Variant validity: the degraded text MUST differ from the original. If a
+variant is a no-op (degradation didn't change the text — e.g. the concept
+string was never present verbatim), it is marked invalid and EXCLUDED from
+the metric. It is never reported as content_drop=0.
 """
 from __future__ import annotations
 
@@ -38,18 +40,30 @@ class ContentSensitivityTest(AuditTest):
         rubric_criteria: list[RubricCriterion],
         degraded_variants: list[Variant],
     ) -> AuditMetric:
-        """Compare original vs quality-degraded variants.
-
-        degraded_variants must be quality_degradation type.
-        """
+        """Compare original vs quality-degraded variants."""
         orig_content = self._engine_analyze(original_transcript, question_text, rubric_criteria)
         orig_delivery = self._delivery.analyze(degraded_variants[0].original_words)
         orig_score = orig_content.overall_score
 
         sensitivity_values: list[float] = []
         variant_details: list[dict] = []
+        invalid_count = 0
 
         for v in degraded_variants:
+            # ── Variant validity check: degraded text MUST differ from original ──
+            if not v.text_differs:
+                invalid_count += 1
+                variant_details.append({
+                    "variant_params": v.params,
+                    "original_score": orig_score,
+                    "degraded_score": None,
+                    "content_drop": None,
+                    "INVALID": "degraded text is identical to original — "
+                               "degradation was a no-op, this variant excluded",
+                    "delivery_wpm_delta": None,
+                })
+                continue
+
             deg_content = self._engine_analyze(v.variant_text, question_text, rubric_criteria)
             deg_delivery = self._delivery.analyze(v.variant_words)
 
@@ -65,7 +79,28 @@ class ContentSensitivityTest(AuditTest):
                 "delivery_wpm_delta": delivery_delta,
             })
 
-        min_sensitivity = min(sensitivity_values) if sensitivity_values else 0.0
+        # If ALL variants were invalid, the test cannot be measured.
+        if not sensitivity_values:
+            return AuditMetric(
+                test_name=self.name,
+                metric_value=0.0,
+                passed=False,
+                threshold=self._threshold,
+                details={
+                    "original_score": orig_score,
+                    "variants": variant_details,
+                    "min_sensitivity": None,
+                },
+                invalid=True,
+                invalid_reason=(
+                    f"all {invalid_count} degraded variant(s) were no-ops "
+                    f"(degraded text == original). content_sensitivity cannot "
+                    f"be measured for this item."
+                ),
+                invalid_variant_count=invalid_count,
+            )
+
+        min_sensitivity = min(sensitivity_values)
         passed = min_sensitivity >= self._threshold
 
         return AuditMetric(
@@ -77,7 +112,10 @@ class ContentSensitivityTest(AuditTest):
                 "original_score": orig_score,
                 "variants": variant_details,
                 "min_sensitivity": min_sensitivity,
+                "invalid_variant_count": invalid_count,
             },
+            invalid=False,
+            invalid_variant_count=invalid_count,
         )
 
     def _engine_analyze(self, text, question, rubric):

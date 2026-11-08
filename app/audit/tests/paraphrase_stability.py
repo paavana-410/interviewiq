@@ -36,8 +36,22 @@ class ParaphraseStabilityTest(AuditTest):
 
         deviations: list[float] = []
         variant_details: list[dict] = []
+        invalid_count = 0
 
         for v in paraphrase_variants:
+            # ── Variant validity: a paraphrase must differ in wording ──
+            if not v.text_differs:
+                invalid_count += 1
+                variant_details.append({
+                    "variant_text_preview": v.variant_text[:80],
+                    "human_verified": v.human_verified,
+                    "original_score": orig_score,
+                    "paraphrase_score": None,
+                    "deviation": None,
+                    "INVALID": "paraphrase text is identical to original",
+                })
+                continue
+
             para_result = self._engine.analyze(
                 transcript_text=v.variant_text,
                 question_text=question_text,
@@ -53,7 +67,25 @@ class ParaphraseStabilityTest(AuditTest):
                 "deviation": deviation,
             })
 
-        max_deviation = max(deviations) if deviations else 0.0
+        if not deviations:
+            return AuditMetric(
+                test_name=self.name,
+                metric_value=0.0,
+                passed=False,
+                threshold=self._threshold,
+                details={
+                    "original_score": orig_score,
+                    "variants": variant_details,
+                    "max_deviation": None,
+                },
+                invalid=True,
+                invalid_reason=(
+                    f"all {invalid_count} paraphrase variant(s) were identical to original."
+                ),
+                invalid_variant_count=invalid_count,
+            )
+
+        max_deviation = max(deviations)
         passed = max_deviation <= self._threshold
 
         return AuditMetric(
@@ -65,5 +97,7 @@ class ParaphraseStabilityTest(AuditTest):
                 "original_score": orig_score,
                 "variants": variant_details,
                 "max_deviation": max_deviation,
+                "invalid_variant_count": invalid_count,
             },
+            invalid_variant_count=invalid_count,
         )

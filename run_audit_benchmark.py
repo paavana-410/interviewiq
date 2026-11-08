@@ -162,6 +162,11 @@ class AnswerItem:
     rubric_criteria: list[dict]
     gold_transcript: str | None
     audio_path: str | None
+    # Hand-written answer tiers for known-groups / content-sensitivity
+    answer_medium: str | None = None
+    answer_weak: str | None = None
+    # concept -> list of sentence indices that carry it (for sentence-based degradation)
+    concept_sentences: dict | None = None
 
 
 @dataclass
@@ -205,19 +210,37 @@ def load_answer_items(answers_dir: Path) -> list[AnswerItem]:
         if not answer_file.exists() or not question_file.exists():
             click.echo(f"  [skip] {sub.name}: missing answer.txt or question.txt")
             continue
+        answer_text = answer_file.read_text(encoding="utf-8").strip()
+        question_text = question_file.read_text(encoding="utf-8").strip()
+        rubric_criteria = (
+            json.loads(rubric_file.read_text(encoding="utf-8"))
+            if rubric_file.exists() else []
+        )
+        # concept_sentences (optional): first rubric entry may carry a
+        # {concept: [sentence_indices]} map for sentence-based degradation.
+        concept_sentences = None
+        if rubric_criteria and isinstance(rubric_criteria[0], dict):
+            concept_sentences = rubric_criteria[0].get("concept_sentences")
+
         items.append(AnswerItem(
             item_id=sub.name,
-            question_text=question_file.read_text(encoding="utf-8").strip(),
-            answer_text=answer_file.read_text(encoding="utf-8").strip(),
-            rubric_criteria=(
-                json.loads(rubric_file.read_text(encoding="utf-8"))
-                if rubric_file.exists() else []
-            ),
+            question_text=question_text,
+            answer_text=answer_text,
+            rubric_criteria=rubric_criteria,
             gold_transcript=(
                 (sub / "gold_transcript.txt").read_text(encoding="utf-8").strip()
                 if (sub / "gold_transcript.txt").exists() else None
             ),
             audio_path=str(sub / "audio.wav") if (sub / "audio.wav").exists() else None,
+            answer_medium=(
+                (sub / "answer_medium.txt").read_text(encoding="utf-8").strip()
+                if (sub / "answer_medium.txt").exists() else None
+            ),
+            answer_weak=(
+                (sub / "answer_weak.txt").read_text(encoding="utf-8").strip()
+                if (sub / "answer_weak.txt").exists() else None
+            ),
+            concept_sentences=concept_sentences,
         ))
     return items
 
@@ -293,6 +316,7 @@ def run_benchmark_for_judge(
     from app.audit.tests.paraphrase_stability import ParaphraseStabilityTest
     from app.audit.tests.repeated_run import RepeatedRunTest
     from app.audit.tests.stt_sensitivity import STTSensitivityTest
+    from app.audit.tests.known_groups import KnownGroupsTest
     from app.audit.variants import VariantGenerator
     from app.config import get_settings
     from app.engines.content import ContentEngine, RubricCriterion
@@ -323,7 +347,11 @@ def run_benchmark_for_judge(
     def _safe_msg(exc: Exception) -> str:
         return mask_secrets_in_text(str(exc), secrets)[:200]
 
-    def _add(test_name, metric_name, value, passed, threshold, details=None):
+    def _add(test_name, metric_name, value, passed, threshold, details=None,
+             invalid=False, invalid_reason=""):
+        d = details or {}
+        if invalid:
+            d = {**d, "invalid": True, "invalid_reason": invalid_reason}
         rows.append(BenchmarkRow(
             run_id=run_id,
             item_id=item.item_id,
@@ -336,7 +364,7 @@ def run_benchmark_for_judge(
             passed=passed,
             threshold=threshold,
             prompt_version=pv,
-            details=json.dumps(details or {}),
+            details=json.dumps(d),
         ))
 
     def _call(fn, label: str):
@@ -412,7 +440,8 @@ def run_benchmark_for_judge(
                     ),
                 ).run(item.answer_text, item.question_text, rubric_criteria, variants)
                 _add(di.test_name, "delivery_invariance_error", di.metric_value,
-                     di.passed, di.threshold, di.details)
+                     di.passed, di.threshold, di.details,
+                     invalid=di.invalid, invalid_reason=di.invalid_reason)
             _call(_di, "delivery_invariance")
 
             def _cs():
@@ -420,8 +449,13 @@ def run_benchmark_for_judge(
                             for c in rubric_criteria if c.expected_concepts][:3]
                 if not concepts:
                     return
+                # Prefer a hand-written degraded answer when present (stronger
+                # evidence than auto-degradation). answer_weak first, else medium.
+                hand_written = item.answer_weak or item.answer_medium
                 deg_v = generator.quality_degradation(
-                    item.answer_text, words, concepts_to_remove=concepts
+                    item.answer_text, words, concepts_to_remove=concepts,
+                    concept_sentences=item.concept_sentences,
+                    hand_written=hand_written,
                 )
                 cs = ContentSensitivityTest(
                     content_engine, delivery_engine,
@@ -430,7 +464,8 @@ def run_benchmark_for_judge(
                     ),
                 ).run(item.answer_text, item.question_text, rubric_criteria, [deg_v])
                 _add(cs.test_name, "content_sensitivity", cs.metric_value,
-                     cs.passed, cs.threshold, cs.details)
+                     cs.passed, cs.threshold, cs.details,
+                     invalid=cs.invalid, invalid_reason=cs.invalid_reason)
             _call(_cs, "content_sensitivity")
 
             def _ps():
@@ -444,7 +479,8 @@ def run_benchmark_for_judge(
                     ),
                 ).run(item.answer_text, item.question_text, rubric_criteria, [para_v])
                 _add(ps.test_name, "paraphrase_deviation", ps.metric_value,
-                     ps.passed, ps.threshold, ps.details)
+                     ps.passed, ps.threshold, ps.details,
+                     invalid=ps.invalid, invalid_reason=ps.invalid_reason)
             _call(_ps, "paraphrase_stability")
 
             def _rr():
@@ -495,6 +531,19 @@ def run_benchmark_for_judge(
                 _add("ablation_with_delivery", "rubric_score_with_delivery",
                      c_abl.overall_score, True, 0.0)
             _call(_ablation, "ablation")
+
+            # ── Known-groups validity (needs strong/medium/weak answers) ────────
+            def _kg():
+                if not (item.answer_medium or item.answer_weak):
+                    return  # no tiered answers for this item — skip silently
+                kg = KnownGroupsTest(content_engine).run(
+                    item.question_text, rubric_criteria,
+                    item.answer_text, item.answer_medium, item.answer_weak,
+                )
+                _add(kg.test_name, "ordering_score", kg.metric_value,
+                     kg.passed, kg.threshold, kg.details,
+                     invalid=kg.invalid, invalid_reason=kg.invalid_reason)
+            _call(_kg, "known_groups")
 
     except RuntimeError as abort_exc:
         safe = mask_secrets_in_text(str(abort_exc), secrets)
@@ -549,20 +598,40 @@ def write_outputs(
 
     df = pd.DataFrame([asdict(r) for r in rows])
 
+    # Parse the "invalid" flag out of each row's details JSON so we can
+    # exclude no-op variants from pass rates (never reported as 0).
+    def _is_invalid(details_str):
+        try:
+            return bool(json.loads(details_str).get("invalid", False))
+        except Exception:
+            return False
+
+    df["invalid"] = df["details"].apply(_is_invalid) if "details" in df.columns else False
+    valid_df = df[~df["invalid"]]
+
     for test_name, grp in df.groupby("test_name"):
+        invalid_n = int(grp["invalid"].sum()) if "invalid" in grp.columns else 0
+        valid_grp = grp[~grp["invalid"]]
         summary["per_test"][test_name] = {
-            "pass_rate": float(grp["passed"].mean()),
-            "mean_metric": float(grp["metric_value"].mean()),
-            "std_metric": float(grp["metric_value"].std()),
+            "pass_rate": float(valid_grp["passed"].mean()) if len(valid_grp) else 0.0,
+            "n_valid": int(len(valid_grp)),
+            "n_invalid": invalid_n,
+            "mean_metric": float(valid_grp["metric_value"].mean()) if len(valid_grp) else None,
+            "std_metric": float(valid_grp["metric_value"].std()) if len(valid_grp) > 1 else None,
             "n": int(len(grp)),
         }
     for judge, grp in df.groupby("judge_name"):
+        valid_grp = grp[~grp["invalid"]] if "invalid" in grp.columns else grp
         summary["per_judge"][judge] = {
             "model": grp["judge_model"].iloc[0],
             "provider": grp["judge_provider"].iloc[0],
-            "overall_pass_rate": float(grp["passed"].mean()),
-            "mean_metric": float(grp["metric_value"].mean()),
+            "overall_pass_rate": float(valid_grp["passed"].mean()) if len(valid_grp) else 0.0,
+            "mean_metric": float(valid_grp["metric_value"].mean()) if len(valid_grp) else None,
+            "n_invalid": int(grp["invalid"].sum()) if "invalid" in grp.columns else 0,
         }
+
+    # Total invalid variants across the run
+    summary["invalid_variants_total"] = int(df["invalid"].sum()) if "invalid" in df.columns else 0
 
     failed = [jr for jr in judge_results if jr.status == "failed"]
     if failed:
@@ -1139,11 +1208,32 @@ def main(
         )
     if all_rows:
         df = pd.DataFrame([asdict(r) for r in all_rows])
+        def _is_invalid(s):
+            try: return bool(json.loads(s).get("invalid", False))
+            except Exception: return False
+        df["invalid"] = df["details"].apply(_is_invalid) if "details" in df.columns else False
         for tn, grp in df.groupby("test_name"):
-            pr = grp["passed"].mean() * 100
-            mv = grp["metric_value"].mean()
+            invalid_n = int(grp["invalid"].sum()) if "invalid" in grp.columns else 0
+            valid_grp = grp[~grp["invalid"]]
+            pr = (valid_grp["passed"].mean() * 100) if len(valid_grp) else 0.0
+            mv = valid_grp["metric_value"].mean() if len(valid_grp) else float("nan")
             icon = "✓" if pr >= 80 else "✗"
-            click.echo(f"  {icon} {tn:<35}  pass={pr:.0f}%  mean={mv:.4f}")
+            inv = f"  invalid={invalid_n}" if invalid_n else ""
+            click.echo(f"  {icon} {tn:<35}  pass={pr:.0f}%  mean={mv:.4f}{inv}")
+
+    # ── Invalid-variant count (total) ────────────────────────────────────────
+    if all_rows:
+        df_all = pd.DataFrame([asdict(r) for r in all_rows])
+        df_all["invalid"] = df_all["details"].apply(
+            lambda s: bool(json.loads(s).get("invalid", False)) if s else False
+        )
+        total_invalid = int(df_all["invalid"].sum())
+        if total_invalid:
+            click.secho(
+                f"\n  ⚠️  {total_invalid} invalid variant(s) excluded from pass rates "
+                f"(degradation/paraphrase was a no-op for those items).",
+                fg="yellow",
+            )
 
     # ── Call stats per judge ─────────────────────────────────────────────────
     click.echo("\n── Call stats ─────────────────────────────────────────────")

@@ -38,6 +38,28 @@ class Variant:
     # For paraphrase variants only
     needs_human_verification: bool = False
     human_verified: bool = False
+    # Source of the degraded text: "auto" (generated) or "handwritten" (from file)
+    source: str = "auto"
+
+    @property
+    def text_differs(self) -> bool:
+        """True if the variant text differs from the original text."""
+        return self.variant_text.strip() != self.original_text.strip()
+
+    @property
+    def timing_differs(self) -> bool:
+        """True if the variant word timestamps differ from the original."""
+        if len(self.variant_words) != len(self.original_words):
+            return True
+        for a, b in zip(self.variant_words, self.original_words):
+            if abs(a.start - b.start) > 1e-6 or abs(a.end - b.end) > 1e-6:
+                return True
+        return False
+
+    @property
+    def differs_from_original(self) -> bool:
+        """True if either text or timing differs."""
+        return self.text_differs or self.timing_differs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -195,17 +217,37 @@ class VariantGenerator:
         words: list[WordTimestamp],
         concepts_to_remove: list[str],
         replacement: str = "some stuff",
+        *,
+        concept_sentences: dict[str, list[int]] | None = None,
+        hand_written: str | None = None,
     ) -> Variant:
-        """Replace key technical concepts with vague/incorrect text.
+        """Degrade answer quality by removing content that carries target concepts.
 
-        Timestamps are rebuilt naively from the degraded text
-        (uniform distribution, same total duration).
+        Two modes:
+          - hand_written: if a hand-written degraded answer is provided (from
+            answer_medium.txt / answer_weak.txt), use it directly. This is the
+            preferred mode because it is a real, human-judged degradation.
+          - auto: otherwise, remove whole SENTENCES that carry the target
+            concepts. `concept_sentences` maps each concept -> list of sentence
+            indices (0-based) that carry it. If provided, those sentences are
+            deleted. If not provided, fall back to removing any sentence that
+            contains the concept string (case-insensitive substring match).
+
+        This replaces the old string-replace approach which was a no-op when
+        the concept name did not appear verbatim in the text.
         """
-        degraded = text
-        for concept in concepts_to_remove:
-            degraded = degraded.replace(concept, replacement)
+        original_text = text
 
-        # Rebuild timestamps at same pace
+        if hand_written is not None and hand_written.strip():
+            degraded = hand_written.strip()
+            source = "handwritten"
+        else:
+            degraded = self._sentence_based_degradation(
+                text, concepts_to_remove, concept_sentences
+            )
+            source = "auto"
+
+        # Rebuild timestamps at same pace from the degraded tokens
         orig_duration = (words[-1].end - words[0].start) if words else 1.0
         degraded_tokens = degraded.split()
         n = len(degraded_tokens)
@@ -223,13 +265,62 @@ class VariantGenerator:
 
         return Variant(
             variant_type="quality_degradation",
-            original_text=text,
+            original_text=original_text,
             variant_text=degraded,
             original_words=words,
             variant_words=new_words,
             seed=self.seed,
-            params={"concepts_removed": concepts_to_remove, "replacement": replacement},
+            params={
+                "concepts_removed": concepts_to_remove,
+                "replacement": replacement,
+                "concept_sentences": concept_sentences,
+                "source": source,
+            },
+            source=source,
         )
+
+    @staticmethod
+    def _split_sentences(text: str) -> list[str]:
+        """Split text into sentences on . ! ? while keeping the delimiter."""
+        import re
+        parts = re.split(r'(?<=[.!?])\s+', text.strip())
+        return [p.strip() for p in parts if p.strip()]
+
+    def _sentence_based_degradation(
+        self,
+        text: str,
+        concepts_to_remove: list[str],
+        concept_sentences: dict[str, list[int]] | None,
+    ) -> str:
+        """Remove sentences that carry the target concepts."""
+        sentences = self._split_sentences(text)
+        if not sentences:
+            return text
+
+        # Build the set of sentence indices to remove
+        remove_indices: set[int] = set()
+        if concept_sentences:
+            for concept in concepts_to_remove:
+                for idx in concept_sentences.get(concept, []):
+                    if 0 <= idx < len(sentences):
+                        remove_indices.add(idx)
+        else:
+            # Fallback: remove any sentence containing the concept (substring, ci)
+            for i, sent in enumerate(sentences):
+                sent_lower = sent.lower()
+                for concept in concepts_to_remove:
+                    if concept.lower() in sent_lower:
+                        remove_indices.add(i)
+                        break
+
+        if not remove_indices:
+            # No sentence matched any concept — degrade is a no-op.
+            # As a last resort, drop the LAST sentence (removes some content).
+            if len(sentences) > 1:
+                remove_indices = {len(sentences) - 1}
+
+        kept = [s for i, s in enumerate(sentences) if i not in remove_indices]
+        return " ".join(kept) if kept else text
 
     # ── 5. Paraphrase (LLM-generated) ─────────────────────────────────────────
 

@@ -1,0 +1,1 @@
+A stack is first in first out and a queue is last in first out. They are both used to store data in a database, and queues are faster because they use more memory.

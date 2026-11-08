@@ -36,10 +36,14 @@ class RepeatedRunTest(AuditTest):
     ) -> AuditMetric:
         scores: list[float] = []
         for i in range(self._n_runs):
+            # run_index=i mixes into the cache key so each repeat is a REAL
+            # call, not a cache hit. Without this, all N repeats return the
+            # same cached response and variance is trivially 0.
             result = self._engine.analyze(
                 transcript_text=transcript_text,
                 question_text=question_text,
                 rubric_criteria=rubric_criteria,
+                run_index=i,
             )
             scores.append(result.overall_score)
 

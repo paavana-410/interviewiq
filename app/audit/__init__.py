@@ -16,4 +16,5 @@ from app.audit.tests.content_sensitivity import ContentSensitivityTest  # noqa: 
 from app.audit.tests.paraphrase_stability import ParaphraseStabilityTest  # noqa: F401
 from app.audit.tests.repeated_run import RepeatedRunTest  # noqa: F401
 from app.audit.tests.stt_sensitivity import STTSensitivityTest  # noqa: F401
+from app.audit.tests.known_groups import KnownGroupsTest  # noqa: F401
 from app.audit.combiner import AuditCombiner, AuditReport  # noqa: F401

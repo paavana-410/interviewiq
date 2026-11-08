@@ -1,0 +1,1 @@
+A REST API lets a frontend talk to a backend over HTTP. You use GET to fetch data and POST to send data, and the data usually comes back as JSON.

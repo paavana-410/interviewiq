@@ -64,8 +64,14 @@ class LLMService(abc.ABC):
         temperature: float = 0.0,
         max_tokens: int = 2048,
         prompt_version: str = "v1",
+        run_index: int | None = None,
     ) -> LLMResponse:
-        """Send a prompt and return the completion."""
+        """Send a prompt and return the completion.
+
+        run_index: when set, is mixed into the disk-cache key so that repeated
+        calls with different indices are distinct real calls (not cache hits).
+        Used by the repeated-run consistency test.
+        """
 
     @property
     @abc.abstractmethod
@@ -125,15 +131,17 @@ class _DiskCache:
         self._dir = Path(cache_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
 
-    def _key(self, model: str, prompt_version: str, prompt: str) -> str:
+    def _key(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None) -> str:
         raw = f"{model}:{prompt_version}:{prompt}"
+        if run_index is not None:
+            raw = f"{model}:{prompt_version}:run{run_index}:{prompt}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def _path(self, key: str) -> Path:
         return self._dir / key[:2] / f"{key}.json"
 
-    def get(self, model: str, prompt_version: str, prompt: str) -> LLMResponse | None:
-        key = self._key(model, prompt_version, prompt)
+    def get(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None) -> LLMResponse | None:
+        key = self._key(model, prompt_version, prompt, run_index)
         p = self._path(key)
         if not p.exists():
             return None
@@ -152,8 +160,8 @@ class _DiskCache:
         except Exception:
             return None
 
-    def put(self, model: str, prompt_version: str, prompt: str, resp: LLMResponse) -> None:
-        key = self._key(model, prompt_version, prompt)
+    def put(self, model: str, prompt_version: str, prompt: str, resp: LLMResponse, run_index: int | None = None) -> None:
+        key = self._key(model, prompt_version, prompt, run_index)
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
         data = {
@@ -220,17 +228,18 @@ class OpenAICompatibleService(LLMService):
         temperature: float = 0.0,
         max_tokens: int = 2048,
         prompt_version: str = "v1",
+        run_index: int | None = None,
     ) -> LLMResponse:
         if self._cache and temperature == 0.0:
-            cached = self._cache.get(self._model, prompt_version, prompt)
+            cached = self._cache.get(self._model, prompt_version, prompt, run_index)
             if cached is not None:
-                logger.debug("Cache hit model=%s", self._model)
+                logger.debug("Cache hit model=%s run_index=%s", self._model, run_index)
                 return cached
 
         resp = self._complete_with_retry(prompt, temperature=temperature, max_tokens=max_tokens)
 
         if self._cache and temperature == 0.0:
-            self._cache.put(self._model, prompt_version, prompt, resp)
+            self._cache.put(self._model, prompt_version, prompt, resp, run_index)
 
         return resp
 
@@ -347,6 +356,7 @@ class MockLLMService(LLMService):
         temperature: float = 0.0,
         max_tokens: int = 2048,
         prompt_version: str = "v1",
+        run_index: int | None = None,
     ) -> LLMResponse:
         if self._fixed is not None:
             return LLMResponse(text=self._fixed, model_name=self._model)
@@ -558,9 +568,10 @@ class OllamaService(LLMService):
         temperature: float = 0.0,
         max_tokens: int = 1024,
         prompt_version: str = "v1",
+        run_index: int | None = None,
     ) -> LLMResponse:
         if self._cache and temperature == 0.0:
-            cached = self._cache.get(self.model_name, prompt_version, prompt)
+            cached = self._cache.get(self.model_name, prompt_version, prompt, run_index)
             if cached is not None:
                 return cached
 
@@ -569,7 +580,7 @@ class OllamaService(LLMService):
         )
 
         if self._cache and temperature == 0.0:
-            self._cache.put(self.model_name, prompt_version, prompt, resp)
+            self._cache.put(self.model_name, prompt_version, prompt, resp, run_index)
 
         return resp
 
