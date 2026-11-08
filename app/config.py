@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # ── Memory guard ─────────────────────────────────────────────────────────
     memory_warn_below_gb: float = 1.5       # warn if less than this is available before stage
 
+    # ── Known-groups validity ─────────────────────────────────────────────────
+    # Strict monotonicity: strong > medium > weak, each adjacent gap >= this margin.
+    # Ties or equal scores across tiers must FAIL. Configurable to avoid hard-coding.
+    known_groups_min_margin: float = 0.1
+
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5
     filler_words: str = "um,uh,like,you know,so,basically,actually,literally"

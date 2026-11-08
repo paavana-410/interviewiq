@@ -260,13 +260,14 @@ def test_known_groups_fails_on_reverse_order_judge():
 
 
 def test_known_groups_passes_on_correct_order_judge():
-    """A judge that scores strong > medium > weak must PASS (sanity check)."""
+    """A judge that scores strong > medium > weak with gaps >= margin PASSES.
+    Here 0.9 / 0.5 / 0.1 → gaps 0.4 each, both >= 0.1 (default margin)."""
     class _CorrectOrderLLM(MockLLMService):
         def __init__(self):
             super().__init__()
             self._model = "correct-order-mock"
         def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
-                     prompt_version="v1", run_index=None):
+                     prompt_version="v1", run_index=None, bypass_cache=False):
             if "STRONGMARKER" in prompt:
                 score = 0.9
             elif "MEDIUMMARKER" in prompt:
@@ -302,6 +303,108 @@ def test_known_groups_passes_on_correct_order_judge():
     assert metric.details["ordering_ok"] is True
 
 
+def test_known_groups_fails_on_equal_scores():
+    """Ties / equal scores across tiers must FAIL under strict ordering.
+    The plain mock returns 0.775 for every input → all tiers equal → FAIL."""
+    llm = MockLLMService()
+    engine = ContentEngine(llm=llm, db=None)
+    rubric = [RubricCriterion(criterion_name="c", criterion_type="correctness",
+                             expected_concepts=[])]
+    test = KnownGroupsTest(engine, min_margin=0.1)
+    metric = test.run(
+        question_text="q",
+        rubric_criteria=rubric,
+        strong_text="a strong answer",
+        medium_text="a medium answer",
+        weak_text="a weak answer",
+    )
+    assert not metric.passed, "equal scores must FAIL (no discriminant validity)"
+    assert metric.details["ordering_ok"] is False
+    # gaps are 0 (equal) which is < margin 0.1
+    assert metric.details["gaps"]["strong_medium"] == 0.0
+    assert metric.details["gaps"]["medium_weak"] == 0.0
+
+
+def test_known_groups_fails_when_gap_below_margin():
+    """Correct direction but a gap smaller than the margin must FAIL."""
+    class _SmallGapLLM(MockLLMService):
+        def __init__(self):
+            super().__init__()
+            self._model = "small-gap-mock"
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
+                     prompt_version="v1", run_index=None, bypass_cache=False):
+            if "STRONGMARKER" in prompt:
+                score = 0.55
+            elif "MEDIUMMARKER" in prompt:
+                score = 0.50
+            elif "WEAKMARKER" in prompt:
+                score = 0.10
+            else:
+                score = 0.50
+            resp_json = {
+                "criteria": [{"criterion_name": "c", "score": score,
+                              "covered_concepts": [], "missing_concepts": [],
+                              "evidence": "x", "star_component": None}],
+                "overall_score": score,
+                "star_detected": {"situation": False, "task": False,
+                                  "action": False, "result": False},
+                "uncertainty": False, "uncertainty_reason": None,
+            }
+            return LLMResponse(text=json.dumps(resp_json), model_name=self._model)
+
+    llm = _SmallGapLLM()
+    engine = ContentEngine(llm=llm, db=None)
+    rubric = [RubricCriterion(criterion_name="c", criterion_type="correctness",
+                             expected_concepts=[])]
+    # strong-medium gap = 0.05 < margin 0.1 → FAIL even though direction is right
+    test = KnownGroupsTest(engine, min_margin=0.1)
+    metric = test.run("q", rubric,
+                      strong_text="STRONGMARKER", medium_text="MEDIUMMARKER",
+                      weak_text="WEAKMARKER")
+    assert not metric.passed
+    assert metric.details["gaps"]["strong_medium"] == pytest.approx(0.05)
+    assert metric.details["gaps"]["medium_weak"] == pytest.approx(0.40)
+
+
+def test_known_groups_passes_with_custom_small_margin():
+    """With a smaller margin, a small-but-positive gap can PASS."""
+    class _SmallGapLLM(MockLLMService):
+        def __init__(self):
+            super().__init__()
+            self._model = "small-gap-mock"
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
+                     prompt_version="v1", run_index=None, bypass_cache=False):
+            if "STRONGMARKER" in prompt:
+                score = 0.55
+            elif "MEDIUMMARKER" in prompt:
+                score = 0.50
+            elif "WEAKMARKER" in prompt:
+                score = 0.10
+            else:
+                score = 0.50
+            resp_json = {
+                "criteria": [{"criterion_name": "c", "score": score,
+                              "covered_concepts": [], "missing_concepts": [],
+                              "evidence": "x", "star_component": None}],
+                "overall_score": score,
+                "star_detected": {"situation": False, "task": False,
+                                  "action": False, "result": False},
+                "uncertainty": False, "uncertainty_reason": None,
+            }
+            return LLMResponse(text=json.dumps(resp_json), model_name=self._model)
+
+    llm = _SmallGapLLM()
+    engine = ContentEngine(llm=llm, db=None)
+    rubric = [RubricCriterion(criterion_name="c", criterion_type="correctness",
+                             expected_concepts=[])]
+    # margin 0.04 → both gaps (0.05, 0.40) >= 0.04 → PASS
+    test = KnownGroupsTest(engine, min_margin=0.04)
+    metric = test.run("q", rubric,
+                      strong_text="STRONGMARKER", medium_text="MEDIUMMARKER",
+                      weak_text="WEAKMARKER")
+    assert metric.passed
+
+
 def test_known_groups_invalid_when_tiers_missing():
     """With only strong (no medium/weak), the check is invalid, not pass/fail."""
     llm = MockLLMService()
@@ -312,3 +415,128 @@ def test_known_groups_invalid_when_tiers_missing():
     metric = test.run("q", rubric, strong_text="strong", medium_text=None, weak_text=None)
     assert metric.invalid is True
     assert not metric.passed
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Degradation-method recording
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_degradation_method_recorded_handwritten():
+    gen = VariantGenerator(seed=42)
+    text = "Some answer."
+    words = _make_words(text)
+    v = gen.quality_degradation(text, words, concepts_to_remove=["x"],
+                                hand_written="A weaker hand-written answer.")
+    assert v.degradation_method == "handwritten_tier"
+    assert v.params["degradation_method"] == "handwritten_tier"
+
+
+def test_degradation_method_recorded_annotated():
+    gen = VariantGenerator(seed=42)
+    text = "Sentence one. Sentence two carries the key idea. Sentence three."
+    words = _make_words(text)
+    v = gen.quality_degradation(text, words, concepts_to_remove=["key idea"],
+                                concept_sentences={"key idea": [1]})
+    assert v.degradation_method == "annotated_sentence_removal"
+
+
+def test_degradation_method_recorded_substring():
+    gen = VariantGenerator(seed=42)
+    text = ("I know LIFO and FIFO. I also know design patterns. "
+            "An example is BFS.")
+    words = _make_words(text)
+    v = gen.quality_degradation(text, words, concepts_to_remove=["LIFO", "FIFO"])
+    assert v.degradation_method == "substring_sentence_removal"
+
+
+def test_degradation_method_recorded_fallback_drop_last():
+    gen = VariantGenerator(seed=42)
+    text = ("This answer mentions nothing related to removed concepts. "
+            "It has a second sentence though.")
+    words = _make_words(text)
+    # No concept_sentences, no substring match → fallback drops last sentence
+    v = gen.quality_degradation(text, words, concepts_to_remove=["nonexistent_xyz"])
+    assert v.degradation_method == "fallback_drop_last_sentence"
+
+
+def test_degradation_method_recorded_no_op():
+    gen = VariantGenerator(seed=42)
+    text = "Only one sentence with no matching concept."
+    words = _make_words(text)
+    v = gen.quality_degradation(text, words, concepts_to_remove=["zzz"])
+    assert v.degradation_method == "no_op"
+    assert not v.text_differs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Judge qualification (qualify_call / qualify_judge standard)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_qualify_call_passes_on_mock():
+    """The mock returns non-empty valid JSON with finish_reason='stop' → qualifies."""
+    from app.services.qualify import qualify_call
+    llm = MockLLMService()
+    qr = qualify_call(llm, "What is OOP?", "OOP is object-oriented programming.")
+    assert qr.ok
+    assert qr.finish_reason == "stop"
+    assert qr.max_tokens_sent == 512
+    assert qr.completion_tokens is not None
+
+
+def test_qualify_call_fails_on_empty_reply():
+    from app.services.qualify import qualify_call
+    llm = MockLLMService(fixed_response="")
+    qr = qualify_call(llm, "q", "a")
+    assert not qr.ok
+    assert "empty" in qr.error.lower()
+
+
+def test_qualify_call_fails_on_invalid_json():
+    from app.services.qualify import qualify_call
+    llm = MockLLMService(fixed_response="this is not json at all")
+    qr = qualify_call(llm, "q", "a")
+    assert not qr.ok
+    assert "json" in qr.error.lower()
+
+
+def test_qualify_call_fails_on_truncated_finish_reason():
+    """finish_reason='length' (truncated) must FAIL even if JSON is valid."""
+    from app.services.qualify import qualify_call
+    class _TruncLLM(MockLLMService):
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
+                     prompt_version="v1", run_index=None, bypass_cache=False):
+            return LLMResponse(
+                text='{"overall_score": 0.5, "one_strength": "x"}',
+                model_name="trunc", finish_reason="length",
+                output_tokens=10, max_tokens_used=512, latency_ms=5,
+            )
+    qr = qualify_call(_TruncLLM(), "q", "a")
+    assert not qr.ok
+    assert qr.finish_reason == "length"
+    assert "stop" in qr.error
+
+
+def test_qualify_call_bypasses_cache():
+    """qualify_call must make a real call even when a cache exists."""
+    from app.services.qualify import qualify_call
+    import tempfile
+    from app.services.llm import _DiskCache
+
+    class _CountingMock(MockLLMService):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
+                     prompt_version="v1", run_index=None, bypass_cache=False):
+            self.calls += 1
+            return LLMResponse(
+                text='{"overall_score": 0.5, "one_strength": "x"}',
+                model_name="counting-mock", finish_reason="stop",
+                output_tokens=10, max_tokens_used=max_tokens, latency_ms=5,
+            )
+
+    llm = _CountingMock()
+    # Two qualify calls → two real calls (bypass_cache=True), not cached
+    qualify_call(llm, "q", "a")
+    qualify_call(llm, "q", "a")
+    assert llm.calls == 2, f"expected 2 real calls, got {llm.calls}"

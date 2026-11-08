@@ -278,22 +278,53 @@ _MAX_CONSECUTIVE_FAILURES = 3
 
 
 def _probe_judges(judge_services: list[tuple[str, object]], secrets: list[str]) -> dict[str, bool]:
-    from check_config import probe_judge
-    from app.services.judge_config import _mask_key
+    """Pre-flight: qualify each judge with ONE real rubric call.
+
+    Uses the same standard as qualify_judge.py (non-empty, valid JSON,
+    finish_reason == 'stop') via app.services.qualify.qualify_call, which
+    bypasses the disk cache so the call is real. Keys are never printed.
+    """
+    from app.services.qualify import qualify_call
+    from app.services.judge_config import _mask_key, mask_secrets_in_text
+
+    _Q = "Explain the difference between a stack and a queue."
+    _A = ("A stack is LIFO; a queue is FIFO. Stacks are used for call stacks "
+          "and queues for scheduling. Both have O(1) core operations.")
 
     results: dict[str, bool] = {}
     for judge_name, svc in judge_services:
-        if getattr(svc, "provider", "") == "mock":
-            results[judge_name] = True
+        cfg = getattr(svc, "_config", None)
+        masked_key = _mask_key(cfg.api_key) if cfg is not None else "***"
+        try:
+            qr = qualify_call(svc, _Q, _A, max_tokens=512)
+        except Exception as exc:
+            safe = mask_secrets_in_text(str(exc), secrets)
+            click.secho(
+                f"  pre-flight [{judge_name}]  key={masked_key}  "
+                f"FAILED — {safe[:120]}",
+                fg="red",
+            )
+            results[judge_name] = False
             continue
-        cfg = svc._config
-        result = probe_judge(cfg)
-        results[judge_name] = result.ok
-        label = f"  pre-flight [{judge_name}]"
-        if result.ok:
-            click.secho(f"{label:<40} OK  ({result.message})", fg="green")
+
+        results[judge_name] = qr.ok
+        label = f"  pre-flight [{judge_name}]  key={masked_key}"
+        if qr.ok:
+            click.secho(
+                f"{label}  OK  finish_reason={qr.finish_reason!r} "
+                f"completion_tokens={qr.completion_tokens} "
+                f"max_tokens_sent={qr.max_tokens_sent} latency={qr.latency_ms}ms",
+                fg="green",
+            )
         else:
-            click.secho(f"{label:<40} FAILED — {result.message}", fg="red")
+            safe_err = mask_secrets_in_text(qr.error, secrets) if qr.error else ""
+            click.secho(
+                f"{label}  FAILED  finish_reason={qr.finish_reason!r} "
+                f"completion_tokens={qr.completion_tokens} "
+                f"max_tokens_sent={qr.max_tokens_sent} latency={qr.latency_ms}ms"
+                + (f" — {safe_err}" if safe_err else ""),
+                fg="red",
+            )
 
     return results
 
@@ -632,6 +663,24 @@ def write_outputs(
 
     # Total invalid variants across the run
     summary["invalid_variants_total"] = int(df["invalid"].sum()) if "invalid" in df.columns else 0
+
+    # ── Degradation-method counts (content_sensitivity variants only) ────────
+    # Each content_sensitivity row's details carries variants[].variant_params.degradation_method.
+    method_counts: dict[str, int] = {}
+    cs_rows = df[df["test_name"] == "content_sensitivity"] if "test_name" in df.columns else df.iloc[0:0]
+    for _, row in cs_rows.iterrows():
+        try:
+            det = json.loads(row["details"])
+        except Exception:
+            continue
+        for v in det.get("variants", []):
+            # A variant may be an invalid no-op (no variant_params) — skip those
+            vp = v.get("variant_params")
+            if not vp:
+                continue
+            m = vp.get("degradation_method", "unknown")
+            method_counts[m] = method_counts.get(m, 0) + 1
+    summary["degradation_methods"] = method_counts
 
     failed = [jr for jr in judge_results if jr.status == "failed"]
     if failed:
@@ -1234,6 +1283,25 @@ def main(
                 f"(degradation/paraphrase was a no-op for those items).",
                 fg="yellow",
             )
+
+    # ── Degradation-method counts ────────────────────────────────────────────
+    if all_rows:
+        cs = df_all[df_all["test_name"] == "content_sensitivity"]
+        m_counts: dict[str, int] = {}
+        for _, row in cs.iterrows():
+            try:
+                det = json.loads(row["details"])
+            except Exception:
+                continue
+            for v in det.get("variants", []):
+                vp = v.get("variant_params")
+                if vp and vp.get("degradation_method"):
+                    m = vp["degradation_method"]
+                    m_counts[m] = m_counts.get(m, 0) + 1
+        if m_counts:
+            click.echo("\n── Degradation methods ─────────────────────────────────────")
+            for m, c in sorted(m_counts.items()):
+                click.echo(f"  {m:<35}  {c}")
 
     # ── Call stats per judge ─────────────────────────────────────────────────
     click.echo("\n── Call stats ─────────────────────────────────────────────")

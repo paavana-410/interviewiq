@@ -40,6 +40,10 @@ class Variant:
     human_verified: bool = False
     # Source of the degraded text: "auto" (generated) or "handwritten" (from file)
     source: str = "auto"
+    # Fine-grained degradation method (quality_degradation only):
+    #   handwritten_tier | annotated_sentence_removal |
+    #   substring_sentence_removal | fallback_drop_last_sentence | no_op
+    degradation_method: str = ""
 
     @property
     def text_differs(self) -> bool:
@@ -237,12 +241,14 @@ class VariantGenerator:
         the concept name did not appear verbatim in the text.
         """
         original_text = text
+        method = ""
 
         if hand_written is not None and hand_written.strip():
             degraded = hand_written.strip()
             source = "handwritten"
+            method = "handwritten_tier"
         else:
-            degraded = self._sentence_based_degradation(
+            degraded, method = self._sentence_based_degradation(
                 text, concepts_to_remove, concept_sentences
             )
             source = "auto"
@@ -275,8 +281,10 @@ class VariantGenerator:
                 "replacement": replacement,
                 "concept_sentences": concept_sentences,
                 "source": source,
+                "degradation_method": method,
             },
             source=source,
+            degradation_method=method,
         )
 
     @staticmethod
@@ -291,19 +299,29 @@ class VariantGenerator:
         text: str,
         concepts_to_remove: list[str],
         concept_sentences: dict[str, list[int]] | None,
-    ) -> str:
-        """Remove sentences that carry the target concepts."""
+    ) -> tuple[str, str]:
+        """Remove sentences that carry the target concepts.
+
+        Returns (degraded_text, method) where method is one of:
+          annotated_sentence_removal — concept_sentences mapping was used
+          substring_sentence_removal   — fallback substring match removed sentences
+          fallback_drop_last_sentence  — no concept matched; dropped last sentence
+          no_op                        — single sentence, nothing could be removed
+        """
         sentences = self._split_sentences(text)
         if not sentences:
-            return text
+            return text, "no_op"
 
         # Build the set of sentence indices to remove
         remove_indices: set[int] = set()
+        method = "no_op"
         if concept_sentences:
             for concept in concepts_to_remove:
                 for idx in concept_sentences.get(concept, []):
                     if 0 <= idx < len(sentences):
                         remove_indices.add(idx)
+            if remove_indices:
+                method = "annotated_sentence_removal"
         else:
             # Fallback: remove any sentence containing the concept (substring, ci)
             for i, sent in enumerate(sentences):
@@ -312,15 +330,21 @@ class VariantGenerator:
                     if concept.lower() in sent_lower:
                         remove_indices.add(i)
                         break
+            if remove_indices:
+                method = "substring_sentence_removal"
 
         if not remove_indices:
             # No sentence matched any concept — degrade is a no-op.
             # As a last resort, drop the LAST sentence (removes some content).
             if len(sentences) > 1:
                 remove_indices = {len(sentences) - 1}
+                method = "fallback_drop_last_sentence"
+            else:
+                # Single sentence and no match → genuinely a no-op.
+                return text, "no_op"
 
         kept = [s for i, s in enumerate(sentences) if i not in remove_indices]
-        return " ".join(kept) if kept else text
+        return (" ".join(kept) if kept else text), method
 
     # ── 5. Paraphrase (LLM-generated) ─────────────────────────────────────────
 

@@ -65,12 +65,16 @@ class LLMService(abc.ABC):
         max_tokens: int = 2048,
         prompt_version: str = "v1",
         run_index: int | None = None,
+        bypass_cache: bool = False,
     ) -> LLMResponse:
         """Send a prompt and return the completion.
 
         run_index: when set, is mixed into the disk-cache key so that repeated
         calls with different indices are distinct real calls (not cache hits).
         Used by the repeated-run consistency test.
+
+        bypass_cache: when True, skip cache lookup AND store — guarantees a real
+        call. Used by qualify_judge.py / pre-flight to test the live judge.
         """
 
     @property
@@ -229,8 +233,9 @@ class OpenAICompatibleService(LLMService):
         max_tokens: int = 2048,
         prompt_version: str = "v1",
         run_index: int | None = None,
+        bypass_cache: bool = False,
     ) -> LLMResponse:
-        if self._cache and temperature == 0.0:
+        if self._cache and temperature == 0.0 and not bypass_cache:
             cached = self._cache.get(self._model, prompt_version, prompt, run_index)
             if cached is not None:
                 logger.debug("Cache hit model=%s run_index=%s", self._model, run_index)
@@ -238,7 +243,7 @@ class OpenAICompatibleService(LLMService):
 
         resp = self._complete_with_retry(prompt, temperature=temperature, max_tokens=max_tokens)
 
-        if self._cache and temperature == 0.0:
+        if self._cache and temperature == 0.0 and not bypass_cache:
             self._cache.put(self._model, prompt_version, prompt, resp, run_index)
 
         return resp
@@ -357,9 +362,13 @@ class MockLLMService(LLMService):
         max_tokens: int = 2048,
         prompt_version: str = "v1",
         run_index: int | None = None,
+        bypass_cache: bool = False,
     ) -> LLMResponse:
         if self._fixed is not None:
-            return LLMResponse(text=self._fixed, model_name=self._model)
+            return LLMResponse(
+                text=self._fixed, model_name=self._model, finish_reason="stop",
+                max_tokens_used=max_tokens,
+            )
 
         response_json = {
             "criteria": [
@@ -396,6 +405,8 @@ class MockLLMService(LLMService):
             input_tokens=len(prompt.split()),
             output_tokens=50,
             latency_ms=5,
+            finish_reason="stop",
+            max_tokens_used=max_tokens,
         )
 
 
@@ -569,8 +580,9 @@ class OllamaService(LLMService):
         max_tokens: int = 1024,
         prompt_version: str = "v1",
         run_index: int | None = None,
+        bypass_cache: bool = False,
     ) -> LLMResponse:
-        if self._cache and temperature == 0.0:
+        if self._cache and temperature == 0.0 and not bypass_cache:
             cached = self._cache.get(self.model_name, prompt_version, prompt, run_index)
             if cached is not None:
                 return cached
@@ -579,7 +591,7 @@ class OllamaService(LLMService):
             prompt, temperature=temperature, max_tokens=max_tokens
         )
 
-        if self._cache and temperature == 0.0:
+        if self._cache and temperature == 0.0 and not bypass_cache:
             self._cache.put(self.model_name, prompt_version, prompt, resp, run_index)
 
         return resp
