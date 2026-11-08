@@ -1003,6 +1003,97 @@ def stage_analysis(run_id: str | None, output_dir: Path) -> None:
     )
 
 
+def _print_call_estimate(
+    items: list[AnswerItem],
+    judges_flag: str,
+    runs: int,
+    skip_preflight: bool,
+    stage: str,
+) -> None:
+    """Print the expected number of LLM requests per judge for the chosen
+    items/runs, including pre-flight and paraphrase generation. Exits without
+    making any API call.
+
+    Per-item per-judge content_engine.analyze() call count:
+      baseline_holistic   = 1
+      baseline_rubric     = 1
+      delivery_invariance  = 1 (orig) + 3 (filler/pause/pace variants) = 4
+      content_sensitivity = 1 (orig) + 1 (degraded)                     = 2
+      paraphrase_stability= 1 (orig) + 1 (paraphrase scored)            = 2
+      repeated_run        = runs
+      ablation            = 1
+      known_groups        = 3 if the item has medium/weak answers else 0
+    Plus paraphrase generation: 1 per item (separate paraphrase model).
+    Plus pre-flight: 1 per judge (qualify_call), unless --skip-preflight.
+
+    NOTE: numbers are estimates. finish_reason='length' retries can add up to
+    +1 call per analyze() (doubled-budget retry), and JSON-parse retries can
+    add up to +2. The estimate counts the happy path (no retries).
+    """
+    # Resolve how many judges (without calling them): mirror resolve_judges
+    from app.services.llm import MockLLMService, get_all_judge_services
+    if judges_flag.strip().lower() == "mock":
+        judge_names = ["mock"]
+    elif judges_flag.strip().lower() == "all":
+        try:
+            judge_names = [n for n, _ in get_all_judge_services()]
+        except Exception:
+            judge_names = ["mock"]
+    else:
+        try:
+            judge_names = [n.strip() for n in judges_flag.split(",") if n.strip()]
+        except Exception:
+            judge_names = []
+
+    n_items = len(items)
+
+    # Per-item judge calls (happy path)
+    base_per_item = (
+        1   # holistic
+        + 1 # rubric
+        + 4 # delivery invariance (orig + 3 variants)
+        + 2 # content sensitivity (orig + degraded)
+        + 2 # paraphrase stability (orig + paraphrase scored)
+        + runs  # repeated run
+        + 1 # ablation
+    )
+    # known-groups: 3 calls per item that has medium or weak answers
+    kg_items = sum(1 for it in items if it.answer_medium or it.answer_weak)
+    kg_calls = 3 * kg_items
+
+    per_item_judge = base_per_item
+    items_total = n_items
+
+    preflight_per_judge = 0 if skip_preflight else 1
+
+    paraphrase_gen_total = n_items  # 1 paraphrase generation per item
+
+    click.echo("\n── Call estimate (no API calls made) ──────────────────────")
+    click.echo(f"  items           : {items_total}")
+    click.echo(f"  runs (repeated) : {runs}")
+    click.echo(f"  kg items        : {kg_items} (3 calls each → {kg_calls} calls)")
+    click.echo(f"  per-item judge  : {per_item_judge} (happy path, no retries)")
+    click.echo(f"  pre-flight      : {preflight_per_judge} per judge"
+               + (" (skipped)" if skip_preflight else ""))
+    click.echo("")
+    click.echo("  Per judge (content eval):")
+    if not judge_names:
+        click.secho("    (no judges resolved)", fg="yellow")
+    grand_total_judge = 0
+    for name in judge_names:
+        total = preflight_per_judge + items_total * per_item_judge + kg_calls
+        grand_total_judge += total
+        click.echo(f"    {name:<32}  {total}  (preflight {preflight_per_judge} "
+                   f"+ {items_total}×{per_item_judge} + kg {kg_calls})")
+    click.echo(f"  {'TOTAL judge calls':<32}  {grand_total_judge}")
+    click.echo(f"  Paraphrase-model calls        : {paraphrase_gen_total} "
+               f"(separate model, 1/item)")
+    click.echo(f"  Grand total (judges + paraphrase): {grand_total_judge + paraphrase_gen_total}")
+    click.echo("\n  NOTE: estimate is the happy path. finish_reason='length' can add")
+    click.echo("  up to +1 per analyze(); JSON-parse retries up to +2. Real usage may be higher.")
+    click.echo("  No API calls were made.\n")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CLI
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1033,6 +1124,12 @@ def stage_analysis(run_id: str | None, output_dir: Path) -> None:
 @click.option("--content-sensitivity-min", default=None, type=float)
 @click.option("--paraphrase-max-deviation", default=None, type=float)
 @click.option("--skip-preflight", is_flag=True)
+@click.option("--max-items", default=None, type=int,
+              help="Use only the first N answer items (after sorting). Default: all")
+@click.option("--estimate-calls", is_flag=True,
+              help="Print the expected number of LLM requests per judge for the "
+                   "chosen items/runs (incl. pre-flight + paraphrase gen) and exit. "
+                   "No API calls are made.")
 def main(
     answers_dir: str,
     stage: str,
@@ -1046,6 +1143,8 @@ def main(
     content_sensitivity_min: float | None,
     paraphrase_max_deviation: float | None,
     skip_preflight: bool,
+    max_items: int | None,
+    estimate_calls: bool,
 ) -> None:
     """InterviewIQ research benchmark. Keys are never printed or logged."""
     from app.config import get_settings
@@ -1096,7 +1195,17 @@ def main(
     if not items:
         click.secho("No valid answer items found.", fg="red")
         raise SystemExit(1)
+
+    # ── --max-items: use only the first N sorted items ────────────────────────
+    if max_items is not None and max_items > 0:
+        items = items[:max_items]
     click.echo(f"  items    : {len(items)}")
+
+    # ── --estimate-calls: compute expected LLM requests, print, exit (no API) ──
+    if estimate_calls:
+        _print_call_estimate(items=items, judges_flag=judges, runs=runs,
+                              skip_preflight=skip_preflight, stage=stage)
+        return
 
     # ── secrets for masking ───────────────────────────────────────────────────
     try:

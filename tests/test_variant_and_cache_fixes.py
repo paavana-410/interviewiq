@@ -417,6 +417,79 @@ def test_known_groups_invalid_when_tiers_missing():
     assert not metric.passed
 
 
+def test_known_groups_passes_on_exact_margin_gaps():
+    """Scores 0.9 / 0.8 / 0.7 with margin 0.1 must PASS.
+
+    Each adjacent gap is exactly 0.1. Without float-epsilon tolerance this can
+    FAIL due to binary floating-point representation (0.9 - 0.8 may be
+    0.09999999999999998). The comparison uses gap >= margin - 1e-9.
+    """
+    class _ExactMarginLLM(MockLLMService):
+        def __init__(self):
+            super().__init__()
+            self._model = "exact-margin-mock"
+        def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
+                     prompt_version="v1", run_index=None, bypass_cache=False):
+            if "STRONGMARKER" in prompt:
+                score = 0.9
+            elif "MEDIUMMARKER" in prompt:
+                score = 0.8
+            elif "WEAKMARKER" in prompt:
+                score = 0.7
+            else:
+                score = 0.5
+            resp_json = {
+                "criteria": [{"criterion_name": "c", "score": score,
+                              "covered_concepts": [], "missing_concepts": [],
+                              "evidence": "x", "star_component": None}],
+                "overall_score": score,
+                "star_detected": {"situation": False, "task": False,
+                                  "action": False, "result": False},
+                "uncertainty": False, "uncertainty_reason": None,
+            }
+            return LLMResponse(text=json.dumps(resp_json), model_name=self._model)
+
+    llm = _ExactMarginLLM()
+    engine = ContentEngine(llm=llm, db=None)
+    rubric = [RubricCriterion(criterion_name="c", criterion_type="correctness",
+                             expected_concepts=[])]
+    test = KnownGroupsTest(engine, min_margin=0.1)
+    metric = test.run("q", rubric,
+                      strong_text="STRONGMARKER", medium_text="MEDIUMMARKER",
+                      weak_text="WEAKMARKER")
+    # The gaps are exactly 0.1 (modulo float noise); epsilon tolerance → PASS
+    assert metric.passed, (
+        f"exact-margin gaps must pass; gaps={metric.details['gaps']}"
+    )
+    assert metric.details["ordering_ok"] is True
+
+
+def test_known_groups_fails_on_constant_mock_scores():
+    """The real MockLLMService returns 0.775 for every input (constant across
+    tiers). Known-groups MUST FAIL — equal scores mean no discriminant validity."""
+    llm = MockLLMService()  # the real, unmodified mock — constant 0.775
+    engine = ContentEngine(llm=llm, db=None)
+    rubric = [RubricCriterion(criterion_name="c", criterion_type="correctness",
+                             expected_concepts=[])]
+    test = KnownGroupsTest(engine, min_margin=0.1)
+    metric = test.run(
+        question_text="q",
+        rubric_criteria=rubric,
+        strong_text="a strong, complete answer about OOP and design patterns.",
+        medium_text="a partial answer mentioning OOP only.",
+        weak_text="a vague answer that misses the point.",
+    )
+    assert not metric.passed, "constant scores across tiers must FAIL"
+    assert metric.details["ordering_ok"] is False
+    # all three tiers scored the same → both gaps are 0
+    assert metric.details["scores"]["strong"] == metric.details["scores"]["medium"]
+    assert metric.details["scores"]["medium"] == metric.details["scores"]["weak"]
+    assert metric.details["gaps"]["strong_medium"] == 0.0
+    assert metric.details["gaps"]["medium_weak"] == 0.0
+    # it is NOT invalid (all tiers present) — it is a real measured failure
+    assert not metric.invalid
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Degradation-method recording
 # ─────────────────────────────────────────────────────────────────────────────

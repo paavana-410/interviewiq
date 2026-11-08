@@ -69,3 +69,36 @@ Never delete entries — add superseding entries if a decision changes.
 **Decision:** `CONTENT_ENGINE_PROMPT_VERSION=v1` in .env. Every call to the LLM logs this version. Cache key includes it.
 **Rationale:** If the prompt changes between runs, results are not comparable. Version tracking makes the change detectable. Bumping the version invalidates the cache and forces re-evaluation.
 **Freeze date:** Prompt v1 is in use. Do not modify the prompt in `app/engines/content.py` without bumping to v2 and logging the change in this file.
+
+## D-008 — Known-groups strict monotonicity with a configurable margin
+
+**Date:** 2026-11-08
+**Decision:** `KnownGroupsTest` requires `strong − medium ≥ margin` AND `medium − weak ≥ margin`, where `margin = KNOWN_GROUPS_MIN_MARGIN` (default **0.1**). Ties or equal scores across tiers FAIL. The comparison is float-epsilon tolerant (`gap ≥ margin − 1e-9`) so a genuine exact-margin gap (e.g. 0.9/0.8/0.7 @ 0.1) passes despite binary rounding.
+**Alternatives considered:**
+- Non-strict `≥` ordering (allowed ties): rejected — a judge that scores every tier the same has no discriminant validity and must not pass.
+- A fixed hard-coded margin: rejected — the margin is a research parameter and should be visible/frozen, not buried.
+**Rationale:** Known-groups validity is a standard construct-validity method; it only means something if a judge can distinguish quality tiers with a clear gap. The margin makes "clear gap" explicit and prevents trivially-small gaps from counting as discrimination.
+**Freeze status:** ❌ NOT YET FROZEN. The margin (0.1) must be frozen before any run tagged `final`. Changing it after seeing results to make a judge pass is p-hacking. Log the freeze date here when frozen.
+**Freeze date:** ___________ (fill in when frozen)
+
+---
+
+## D-009 — Judge qualification standard (non-empty, valid JSON, finish_reason == "stop")
+
+**Date:** 2026-11-08
+**Decision:** A judge is "usable" only if a real rubric call returns (1) a non-empty reply, (2) parseable JSON, (3) `finish_reason == "stop"`. This single standard is implemented in `app/services/qualify.py` (`qualify_call`, which bypasses the disk cache) and used by both `qualify_judge.py` (3 calls on fixed strong/medium/weak answers) and the benchmark pre-flight (1 call per judge).
+**Alternatives considered:**
+- HTTP 200 only (old pre-flight probe): rejected — a 200 with a truncated or non-JSON reply is not a usable judge.
+- Reusing the disk cache for qualification: rejected — a cached hit would mask a currently-broken key/endpoint. `bypass_cache=True` forces a real call.
+**Rationale:** `finish_reason == "stop"` guarantees the model finished naturally rather than hitting the token limit (which would silently truncate the rubric JSON). Combined with the JSON check, this is the minimum bar before spending a full benchmark's worth of calls on a judge.
+**Note:** `MockLLMService` sets `finish_reason="stop"` so the mock qualifies and can be used in tests/CI without real keys.
+
+---
+
+## D-010 — Record the degradation method on every quality-degradation variant
+
+**Date:** 2026-11-08
+**Decision:** Every `quality_degradation` variant records `degradation_method` ∈ {`handwritten_tier`, `annotated_sentence_removal`, `substring_sentence_removal`, `fallback_drop_last_sentence`, `no_op`}. The benchmark writes per-method counts to `summary.json` (`degradation_methods`) and prints them at run end.
+**Alternatives considered:**
+- A single `source` field (`auto`/`handwritten`): rejected — too coarse; the paper needs to know whether a degraded variant came from a hand-written tier (strong evidence) vs an automatic fallback drop-last-sentence (weak evidence).
+**Rationale:** The content_sensitivity artifact (see threats T-I-5 / research log 2026-11-08) was caused by a no-op degradation. Recording the exact method makes the provenance of every degraded variant auditable, and lets the paper report the mix of degradation sources used. A `no_op` variant is now marked invalid and excluded from the metric (never reported as 0).

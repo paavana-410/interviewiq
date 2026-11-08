@@ -10,6 +10,35 @@ Rules:
 
 ---
 
+## 2026-11-08 (b) — strict known-groups, qualify standard, degradation methods, call estimates
+
+**Goal:** Make known-groups a real validity check (strict, fails on equal scores), formalise the judge qualification standard, record how each degradation was produced, and let runs be planned without spending API quota.
+
+**Did:**
+- `KnownGroupsTest`: changed to strict monotonicity with a configurable margin (`KNOWN_GROUPS_MIN_MARGIN`, default 0.1). Pass requires `strong − medium ≥ margin` AND `medium − weak ≥ margin`. Ties / equal scores now FAIL (no discriminant validity). Float-epsilon tolerance (`gap ≥ margin − 1e-9`) so an exact 0.1 gap from 0.9/0.8/0.7 passes despite binary rounding.
+- `qualify_judge.py` + `app/services/qualify.py`: a single standard for "is this judge usable" — a real rubric call must return non-empty, valid JSON, AND `finish_reason == "stop"`. `qualify_call()` bypasses the disk cache. `LLMService.complete()` gained `bypass_cache`; the mock now sets `finish_reason="stop"`. Pre-flight in the benchmark uses the same `qualify_call` (one per judge), replacing the old trivial probe.
+- Degradation-method recording: every `quality_degradation` variant carries `degradation_method` ∈ {`handwritten_tier`, `annotated_sentence_removal`, `substring_sentence_removal`, `fallback_drop_last_sentence`, `no_op`}. `summary.json` reports per-method counts (`degradation_methods`); the run-end summary prints them.
+- `run_audit_benchmark.py`: added `--estimate-calls` (prints expected LLM requests per judge incl. pre-flight + paraphrase gen, and exits with no API call) and `--max-items N` (use only the first N items).
+
+**Result:**
+- `pytest`: 80/80 pass. New tests: exact-margin gaps (0.9/0.8/0.7 @ 0.1) pass; the real `MockLLMService` (constant 0.775 across tiers) FAILS known-groups; 5 degradation-method tests; 5 qualify tests (incl. cache-bypass).
+- `qualify_judge.py --judge mock` → PASS (3 calls, `finish_reason='stop'`).
+- `--estimate-calls` on 2 items, 1 run → 31 judge calls + 2 paraphrase calls, no API made.
+
+**Problems:**
+- Known-groups cannot be validated meaningfully with the mock judge (it returns equal scores, so it now correctly FAILS — only a real judge or a reversed-order unit mock exercises a pass).
+
+**Decision:**
+- The known-groups margin (0.1) is researcher-chosen and stored in config. It MUST be frozen before any run tagged `final`, same as the audit thresholds. See decisions.md D-008.
+- The qualify standard (non-empty + valid JSON + `finish_reason=='stop'`) is now the gate for every judge, in both `qualify_judge.py` and pre-flight. See decisions.md D-009.
+- Degradation methods are recorded so the paper can report how each degraded variant was produced (hand-written vs auto-sentence-removal vs fallback). See decisions.md D-010.
+
+**Next:**
+- Re-run the text stage with a real judge once OpenRouter quota resets, using the hand-written medium/weak tiers, to get a citable known-groups + content_sensitivity result on the fixed code.
+- Freeze margins/thresholds (log the freeze date) before the first `final` run.
+
+---
+
 ## 2026-11-08
 
 **Goal:** Diagnose why `content_sensitivity` was 0 on the v1 pilot run, and fix the audit layer so the metric is never an artifact.

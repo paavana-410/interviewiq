@@ -63,8 +63,12 @@ class KnownGroupsTest(AuditTest):
         all_present = len(scores) == 3
 
         # ── Strict monotonicity with margin ──────────────────────────────────
-        # strong > medium >= margin gap, medium > weak >= margin gap.
+        # strong > medium, medium > weak, each adjacent gap >= margin.
         # Ties (equal scores) FAIL because the gap would be 0 < margin.
+        # The comparison is tolerant of float rounding: gap >= margin - 1e-9.
+        # Without this, a genuine 0.1 gap (e.g. 0.9-0.8) can fail due to
+        # binary floating-point representation.
+        _EPS = 1e-9
         gaps: dict[str, float | None] = {"strong_medium": None, "medium_weak": None}
         ordering_ok = True
         ordering_reason = ""
@@ -72,7 +76,7 @@ class KnownGroupsTest(AuditTest):
         if "strong" in scores and "medium" in scores:
             gap = scores["strong"] - scores["medium"]
             gaps["strong_medium"] = gap
-            if gap < self._margin:
+            if gap < self._margin - _EPS:
                 ordering_ok = False
                 ordering_reason = (
                     f"strong({scores['strong']:.3f}) - medium({scores['medium']:.3f}) "
@@ -81,7 +85,7 @@ class KnownGroupsTest(AuditTest):
         if "medium" in scores and "weak" in scores:
             gap = scores["medium"] - scores["weak"]
             gaps["medium_weak"] = gap
-            if gap < self._margin:
+            if gap < self._margin - _EPS:
                 ordering_ok = False
                 reason = (
                     f"medium({scores['medium']:.3f}) - weak({scores['weak']:.3f}) "
