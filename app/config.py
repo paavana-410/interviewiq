@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # ── Memory guard ─────────────────────────────────────────────────────────
     memory_warn_below_gb: float = 1.5       # warn if less than this is available before stage
 
+    # ── UI / inline evaluation ───────────────────────────────────────────────
+    # When False (default), the inline response pipeline runs STT + Delivery +
+    # Content only — audits are skipped to keep per-response latency low.
+    audit_inline: bool = False
+
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5
     filler_words: str = "um,uh,like,you know,so,basically,actually,literally"

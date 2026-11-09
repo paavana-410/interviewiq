@@ -159,6 +159,8 @@ class InterviewSession(Base):
     status: Mapped[SessionStatus] = mapped_column(
         Enum(SessionStatus), default=SessionStatus.ACTIVE
     )
+    # UI sessions store their ordered question list here as JSON
+    meta_json = _json_col()
 
     user: Mapped["User | None"] = relationship(back_populates="sessions")
     question: Mapped["Question | None"] = relationship(back_populates="sessions")
@@ -171,6 +173,10 @@ class Response(Base):
     response_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("interview_sessions.session_id", ondelete="CASCADE"), nullable=False
+    )
+    # question answered in this response (set by the UI pipeline)
+    question_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("questions.question_id", ondelete="SET NULL"), nullable=True
     )
     audio_path: Mapped[str | None] = mapped_column(String(255))
     duration_sec: Mapped[int | None] = mapped_column(Integer)

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>InterviewIQ — Results</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:#f4f6fa;padding:1.5rem}
+    .mock-banner{background:#d9534f;color:#fff;text-align:center;padding:.6rem 1rem;font-weight:600;border-radius:8px;margin-bottom:1.2rem;display:none}
+    .real-banner{background:#27ae60;color:#fff;text-align:center;padding:.55rem 1rem;font-weight:600;border-radius:8px;margin-bottom:1.2rem;display:none}
+    .container{max-width:800px;margin:0 auto}
+    h1{font-size:1.7rem;color:#1a1a2e;margin-bottom:1.5rem}
+    .card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.09);padding:1.6rem 2rem;margin-bottom:1.4rem}
+    .q-num{font-size:.75rem;font-weight:700;text-transform:uppercase;color:#4361ee;margin-bottom:.4rem}
+    .q-text{font-size:1rem;font-weight:600;color:#1a1a2e;margin-bottom:1rem;line-height:1.4}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.7rem;margin-bottom:1rem}
+    .metric{background:#f4f6fa;border-radius:8px;padding:.6rem .8rem;text-align:center}
+    .metric .val{font-size:1.25rem;font-weight:700;color:#4361ee}
+    .metric .lbl{font-size:.7rem;color:#888;margin-top:.1rem}
+    .score-bar{height:8px;background:#e0e4f0;border-radius:4px;overflow:hidden;margin:.3rem 0}
+    .score-fill{height:100%;background:#4361ee;border-radius:4px}
+    .section{margin-top:1rem}
+    .section-title{font-size:.8rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem}
+    .criterion{display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.7rem}
+    .cname{min-width:120px;font-size:.85rem;font-weight:600;color:#333}
+    .cdetail{flex:1;font-size:.85rem;color:#444;line-height:1.4}
+    .evidence{font-style:italic;color:#666;font-size:.82rem;border-left:3px solid #ccd;padding-left:.6rem;margin-top:.3rem}
+    .pill{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.72rem;font-weight:600;margin:.15rem}
+    .pill.covered{background:#e8f5e9;color:#27ae60}
+    .pill.missing{background:#fde8e8;color:#d9534f}
+    .transcript{font-size:.85rem;color:#444;background:#f8f9ff;padding:.8rem 1rem;border-radius:8px;line-height:1.5;margin-top:.6rem}
+    .new-btn{display:inline-block;margin-top:2rem;padding:.8rem 2rem;background:#4361ee;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;font-size:.95rem}
+    .loading{text-align:center;color:#666;padding:3rem}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="mock-banner" id="mockBanner">⚠ DEMO MODE: mock scores, not real evaluation.</div>
+  <div class="real-banner" id="realBanner" id="realBanner"></div>
+  <h1>Your Interview Results</h1>
+  <div id="content"><div class="loading">Loading results…</div></div>
+</div>
+
+<script>
+  const params=new URLSearchParams(location.search);
+  const sid=params.get("session_id");
+  if(!sid){location.href="/ui/";}
+
+  function pct(v){return v!=null?(v*100).toFixed(0)+"%":"—";}
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  function scoreColor(v){
+    if(v==null)return"#ccc";
+    if(v>=0.7)return"#27ae60";
+    if(v>=0.4)return"#f0a500";
+    return"#d9534f";
+  }
+
+  function renderMetric(val,label){
+    return `<div class="metric"><div class="val">${esc(val)}</div><div class="lbl">${esc(label)}</div></div>`;
+  }
+
+  function renderCriteria(evidence){
+    if(!evidence||!evidence.criteria)return"";
+    return evidence.criteria.map(c=>{
+      const covered=(c.covered_concepts||[]).map(x=>`<span class="pill covered">${esc(x)}</span>`).join("");
+      const missing=(c.missing_concepts||[]).map(x=>`<span class="pill missing">${esc(x)}</span>`).join("");
+      const ev=c.evidence?`<div class="evidence">"${esc(c.evidence)}"</div>`:"";
+      return `<div class="criterion">
+        <div class="cname">${esc(c.criterion_name)}</div>
+        <div class="cdetail">
+          <div><strong>${pct(c.score)}</strong>
+            <div class="score-bar"><div class="score-fill" style="width:${pct(c.score)};background:${scoreColor(c.score)}"></div></div>
+          </div>
+          ${covered||missing?`<div>${covered}${missing}</div>`:""}
+          ${ev}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function load(){
+    const r=await fetch(`/interview/sessions/${sid}/summary`);
+    if(!r.ok){document.getElementById("content").innerHTML=`<div class="loading">Error loading results.</div>`;return;}
+    const data=await r.json();
+
+    if(data.is_mock){
+      document.getElementById("mockBanner").style.display="block";
+    } else {
+      const rb=document.getElementById("realBanner");
+      rb.textContent=`Evaluated by: ${data.judge_provider} / ${data.judge_model}`;
+      rb.style.display="block";
+    }
+
+    if(!data.answers||data.answers.length===0){
+      document.getElementById("content").innerHTML=`<div class="loading">No answers recorded yet. <a href="/ui/interview.html?session_id=${sid}">Go back</a></div>`;
+      return;
+    }
+
+    let html="";
+    data.answers.forEach((a,i)=>{
+      const score=a.overall_score!=null?(a.overall_score*100).toFixed(0)+"%":"—";
+      const wpm=a.wpm!=null?a.wpm.toFixed(0)+"wpm":"—";
+      const fillers=a.filler_density!=null?a.filler_density.toFixed(1)+"/100w":"—";
+      const dur=a.duration_sec!=null?a.duration_sec+"s":"—";
+      const pauses=a.long_pause_count!=null?a.long_pause_count:"—";
+
+      html+=`<div class="card">
+        <div class="q-num">Question ${i+1}</div>
+        <div class="q-text">${esc(a.question_text||"—")}</div>
+
+        <div class="metrics">
+          ${renderMetric(score,"Content")}
+          ${renderMetric(wpm,"Speaking rate")}
+          ${renderMetric(fillers,"Fillers")}
+          ${renderMetric(dur,"Duration")}
+          ${renderMetric(pauses,"Long pauses")}
+        </div>
+
+        <div class="section">
+          <div class="section-title">Per-criterion scores &amp; evidence</div>
+          ${renderCriteria(a.evidence_json)||"<em style='font-size:.85rem;color:#aaa'>No criteria available.</em>"}
+        </div>
+
+        <div class="section">
+          <div class="section-title">Transcript</div>
+          <div class="transcript">${esc(a.transcript||"(no transcript)")}</div>
+        </div>
+      </div>`;
+    });
+
+    html+=`<a href="/ui/" class="new-btn">Start new interview</a>`;
+    document.getElementById("content").innerHTML=html;
+  }
+
+  load();
+</script>
+</body>
+</html>
