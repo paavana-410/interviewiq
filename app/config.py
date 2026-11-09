@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # Ties or equal scores across tiers must FAIL. Configurable to avoid hard-coding.
     known_groups_min_margin: float = 0.1
 
+    # ── UI / inline evaluation ───────────────────────────────────────────────
+    # When False (default), the inline response pipeline runs STT + Delivery +
+    # Content only — audits are skipped to keep per-response latency low.
+    audit_inline: bool = False
+
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5
     filler_words: str = "um,uh,like,you know,so,basically,actually,literally"

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>InterviewIQ — Start</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:#f4f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
+    .card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.1);padding:2.5rem 3rem;max-width:480px;width:100%}
+    h1{font-size:1.8rem;color:#1a1a2e;margin-bottom:.4rem}
+    .sub{color:#666;font-size:.95rem;margin-bottom:2rem;line-height:1.5}
+    label{display:block;font-size:.85rem;font-weight:600;color:#333;margin-bottom:.3rem;margin-top:1.2rem}
+    select,input[type=range]{width:100%;padding:.55rem .75rem;border:1.5px solid #ccd;border-radius:8px;font-size:1rem;background:#fafbff}
+    input[type=range]{padding:0;margin-top:.4rem}
+    .range-row{display:flex;align-items:center;gap:.8rem}
+    .range-row span{font-weight:700;min-width:1.5rem;color:#4361ee}
+    .btn{display:block;width:100%;margin-top:2rem;padding:.85rem;background:#4361ee;color:#fff;border:none;border-radius:8px;font-size:1.05rem;font-weight:600;cursor:pointer;transition:background .2s}
+    .btn:hover{background:#3451d1}
+    .mode-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-top:.4rem}
+    .mode-btn{padding:.7rem;border:2px solid #ccd;border-radius:8px;background:#fafbff;cursor:pointer;font-size:.9rem;font-weight:500;color:#333;text-align:center;transition:all .15s}
+    .mode-btn.active{border-color:#4361ee;background:#ebedff;color:#4361ee}
+    #err{color:#d9534f;font-size:.85rem;margin-top:.8rem;display:none}
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>InterviewIQ</h1>
+  <p class="sub">Practice your placement interview with instant AI feedback on content and delivery.</p>
+
+  <label>Interview mode</label>
+  <div class="mode-grid" id="modeGrid">
+    <div class="mode-btn active" data-mode="mixed">Mixed</div>
+    <div class="mode-btn" data-mode="behavioral">Behavioural</div>
+    <div class="mode-btn" data-mode="technical">Technical</div>
+  </div>
+
+  <label>Number of questions</label>
+  <div class="range-row">
+    <input type="range" id="nq" min="3" max="6" value="5" step="1"/>
+    <span id="nqVal">5</span>
+  </div>
+
+  <button class="btn" id="startBtn">Start Interview →</button>
+  <div id="err"></div>
+</div>
+
+<script>
+  let mode = "mixed";
+  document.querySelectorAll(".mode-btn").forEach(b=>{
+    b.onclick=()=>{ document.querySelectorAll(".mode-btn").forEach(x=>x.classList.remove("active")); b.classList.add("active"); mode=b.dataset.mode; };
+  });
+  const nq=document.getElementById("nq"), nqv=document.getElementById("nqVal");
+  nq.oninput=()=>nqv.textContent=nq.value;
+
+  document.getElementById("startBtn").onclick=async()=>{
+    document.getElementById("err").style.display="none";
+    const btn=document.getElementById("startBtn");
+    btn.disabled=true; btn.textContent="Creating session…";
+    try{
+      const r=await fetch("/interview/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,n_questions:+nq.value})});
+      if(!r.ok){const e=await r.json(); throw new Error(e.detail||"Server error");}
+      const {session_id}=await r.json();
+      location.href=`/ui/interview.html?session_id=${session_id}`;
+    }catch(e){
+      document.getElementById("err").textContent=e.message;
+      document.getElementById("err").style.display="block";
+      btn.disabled=false; btn.textContent="Start Interview →";
+    }
+  };
+</script>
+</body>
+</html>

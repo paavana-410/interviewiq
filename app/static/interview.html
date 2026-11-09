@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>InterviewIQ — Interview</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:#f4f6fa;min-height:100vh;padding:1.5rem}
+    .mock-banner{background:#d9534f;color:#fff;text-align:center;padding:.6rem 1rem;font-weight:600;font-size:.9rem;border-radius:8px;margin-bottom:1.2rem;display:none}
+    .card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.1);padding:2rem 2.5rem;max-width:700px;margin:0 auto}
+    .progress{font-size:.8rem;color:#888;margin-bottom.6rem;margin-bottom:.6rem}
+    h2{font-size:1.3rem;color:#1a1a2e;margin:1rem 0 1.5rem;line-height:1.5}
+    .controls{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.5rem}
+    .btn{padding:.7rem 1.4rem;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .15s}
+    #speakBtn{background:#f0f3ff;color:#4361ee;border:2px solid #4361ee}
+    #recordBtn{background:#4361ee;color:#fff}
+    #recordBtn:disabled{opacity:.5;cursor:not-allowed}
+    #stopBtn{background:#d9534f;color:#fff;display:none}
+    #nextBtn{background:#27ae60;color:#fff;display:none}
+    .status{margin-top:1.2rem;font-size:.9rem;color:#555;min-height:1.4rem}
+    #transcript{margin-top:1rem;padding:.8rem 1rem;background:#f8f9ff;border-radius:8px;font-size:.9rem;color:#333;display:none;line-height:1.5}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;border-top-color:#4361ee;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.4rem}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .done-banner{text-align:center;color:#27ae60;font-size:1.1rem;font-weight:700;padding:2rem;display:none}
+    .judge-tag{font-size:.75rem;color:#888;margin-top:.5rem}
+  </style>
+</head>
+<body>
+
+<div class="mock-banner" id="mockBanner">⚠ DEMO MODE: mock scores, not real evaluation.</div>
+
+<div class="card" id="mainCard">
+  <div class="progress" id="progress">Loading…</div>
+  <h2 id="qText">—</h2>
+  <div class="judge-tag" id="judgeTag"></div>
+
+  <div class="controls">
+    <button class="btn" id="speakBtn" onclick="speak()">🔊 Speak question</button>
+    <button class="btn" id="recordBtn" onclick="startRec()">● Record answer</button>
+    <button class="btn" id="stopBtn" onclick="stopRec()">■ Stop recording</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="transcript"></div>
+  <button class="btn" id="nextBtn" onclick="loadNext()">Next question →</button>
+  <div class="done-banner" id="doneBanner">✓ All questions answered! <a href="#" onclick="goResults()">See results →</a></div>
+</div>
+
+<script>
+  const params=new URLSearchParams(location.search);
+  const sid=params.get("session_id");
+  if(!sid){location.href="/ui/";}
+
+  let currentQid=null, mediaRecorder=null, chunks=[], judgeInfo={};
+
+  async function init(){
+    // Judge info banner
+    const ji=await fetch("/interview/judge-info").then(r=>r.json()).catch(()=>({is_mock:true,provider:"mock",model:"mock"}));
+    judgeInfo=ji;
+    if(ji.is_mock){document.getElementById("mockBanner").style.display="block";}
+    document.getElementById("judgeTag").textContent=`Judge: ${ji.provider} / ${ji.model}`;
+    await loadNext();
+  }
+
+  async function loadNext(){
+    document.getElementById("nextBtn").style.display="none";
+    document.getElementById("transcript").style.display="none";
+    document.getElementById("transcript").textContent="";
+    document.getElementById("status").textContent="";
+    const r=await fetch(`/interview/sessions/${sid}/next-question`);
+    const data=await r.json();
+    if(data.done){
+      document.getElementById("qText").textContent="All questions answered!";
+      document.getElementById("progress").textContent="Done";
+      document.getElementById("doneBanner").style.display="block";
+      document.getElementById("recordBtn").disabled=true;
+      document.getElementById("speakBtn").disabled=true;
+      return;
+    }
+    currentQid=data.question_id;
+    document.getElementById("progress").textContent=`Question ${data.question_number} of ${data.total_questions} · ${data.category}`;
+    document.getElementById("qText").textContent=data.question_text;
+    // Auto-speak
+    speak();
+  }
+
+  function speak(){
+    if(!currentQid) return;
+    const txt=document.getElementById("qText").textContent;
+    if("speechSynthesis" in window){
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(txt);
+      u.lang="en-US"; u.rate=0.95;
+      speechSynthesis.speak(u);
+    }
+  }
+
+  async function startRec(){
+    chunks=[];
+    let stream;
+    try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ setStatus("Microphone access denied: "+e.message); return; }
+    mediaRecorder=new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+    mediaRecorder.onstop=uploadAudio;
+    mediaRecorder.start();
+    document.getElementById("recordBtn").style.display="none";
+    document.getElementById("stopBtn").style.display="inline-block";
+    setStatus("Recording…");
+  }
+
+  function stopRec(){
+    if(mediaRecorder&&mediaRecorder.state!=="inactive") mediaRecorder.stop();
+    document.getElementById("stopBtn").style.display="none";
+    document.getElementById("recordBtn").style.display="inline-block";
+    setStatus('<span class="spinner"></span> Uploading & evaluating…');
+  }
+
+  async function uploadAudio(){
+    const mimeType=MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":"audio/ogg";
+    const blob=new Blob(chunks,{type:mimeType});
+    const ext=mimeType.includes("webm")?".webm":".ogg";
+    const fd=new FormData();
+    fd.append("audio",blob,"answer"+ext);
+
+    try{
+      const r=await fetch(`/interview/sessions/${sid}/responses?question_id=${currentQid}`,{method:"POST",body:fd});
+      if(!r.ok){const e=await r.json(); throw new Error(e.detail||"Upload failed");}
+      const result=await r.json();
+      showResult(result);
+    }catch(e){
+      setStatus("Error: "+e.message);
+    }
+  }
+
+  function showResult(r){
+    const score=(r.overall_score*100).toFixed(0);
+    const wpm=r.wpm?r.wpm.toFixed(0):"—";
+    const fillers=r.filler_density?r.filler_density.toFixed(1):"0";
+    const duration=r.duration_sec?r.duration_sec.toFixed(1):"—";
+    const t=document.getElementById("transcript");
+    t.innerHTML=`<strong>Transcript:</strong> ${escHtml(r.transcript||"(empty)")}<br><br>`
+      +`<strong>Content score: ${score}%</strong>&nbsp;&nbsp;`
+      +`WPM: ${wpm}&nbsp;&nbsp;Fillers/100w: ${fillers}&nbsp;&nbsp;Duration: ${duration}s`
+      +(r.uncertainty?`<br><em>⚠ Low-confidence evaluation</em>`:"");
+    t.style.display="block";
+    setStatus(`✓ Evaluated  (score: ${score}%)`);
+    document.getElementById("nextBtn").style.display="inline-block";
+  }
+
+  function goResults(){ location.href=`/ui/results.html?session_id=${sid}`; }
+  function setStatus(html){ document.getElementById("status").innerHTML=html; }
+  function escHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  init();
+</script>
+</body>
+</html>

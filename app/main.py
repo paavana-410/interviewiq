@@ -2,20 +2,20 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import annotations, responses, sessions
+from app.api.routes import annotations, interview, responses, sessions
 from app.config import get_settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure upload / experiment dirs exist
     get_settings()
     yield
-    # Shutdown: nothing to clean up
 
 
 def create_app() -> FastAPI:
@@ -43,10 +43,22 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(responses.router)
     app.include_router(annotations.router)
+    app.include_router(interview.router)
+
+    # Serve plain-HTML UI from app/static
+    static_dir = Path(__file__).parent / "static"
+    static_dir.mkdir(exist_ok=True)
+    app.mount("/ui", StaticFiles(directory=str(static_dir), html=True), name="ui")
 
     @app.get("/health", tags=["meta"])
     def health():
-        return {"status": "ok", "provider": settings.llm_provider}
+        from app.utils.audio import audio_dep_info
+        return {
+            "status": "ok",
+            "provider": settings.llm_provider,
+            "audit_inline": settings.audit_inline,
+            "audio": audio_dep_info(),
+        }
 
     return app
 
