@@ -44,7 +44,12 @@ from app.models.core import (
     SessionStatus,
     Transcript,
 )
-from app.orchestration.slim_pipeline import run_slim_pipeline
+from app.orchestration.slim_pipeline import (
+    SlimResult,
+    UIJudgeNotConfigured,
+    WhisperUnavailable,
+    run_slim_pipeline,
+)
 from app.utils.audio import audio_dep_info, save_upload
 
 router = APIRouter(prefix="/interview", tags=["interview-ui"])
@@ -116,15 +121,15 @@ def _get_judge_info() -> dict:
     s = get_settings()
     if s.llm_provider == "mock":
         return {"provider": "mock", "model": "mock-llm", "is_mock": True}
+    if not s.ui_judge:
+        return {"provider": "unconfigured", "model": "UI_JUDGE not set", "is_mock": False, "error": True}
     try:
         from app.services.judge_config import get_judge_registry
         reg = get_judge_registry()
-        if reg.judges:
-            j = reg.judges[0]
-            return {"provider": j.provider, "model": j.model, "is_mock": False}
-    except Exception:
-        pass
-    return {"provider": s.llm_provider, "model": "unknown", "is_mock": False}
+        cfg = reg.get_judge(s.ui_judge)
+        return {"provider": cfg.provider, "model": cfg.model, "is_mock": False}
+    except Exception as exc:
+        return {"provider": "error", "model": str(exc)[:80], "is_mock": False, "error": True}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +237,7 @@ class SlimResultResponse(BaseModel):
     response_id: int
     question_text: str
     transcript: str
+    transcript_source: str        # "whisper" | "synthetic" | "mock"
     wpm: float
     pause_count: int
     long_pause_count: int
@@ -249,6 +255,7 @@ class SlimResultResponse(BaseModel):
     uncertainty: bool
     judge_model: str
     judge_provider: str
+    is_mock: bool
 
 
 @router.post(
@@ -286,6 +293,10 @@ async def submit_interview_response(
 
     try:
         result = run_slim_pipeline(response_id=response.response_id, db=db)
+    except UIJudgeNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except WhisperUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {exc}")
 
@@ -293,6 +304,7 @@ async def submit_interview_response(
         response_id=result.response_id,
         question_text=result.question_text,
         transcript=result.transcript,
+        transcript_source=result.transcript_source,
         wpm=result.wpm,
         pause_count=result.pause_count,
         long_pause_count=result.long_pause_count,
@@ -310,6 +322,7 @@ async def submit_interview_response(
         uncertainty=result.uncertainty,
         judge_model=result.judge_model,
         judge_provider=result.judge_provider,
+        is_mock=result.is_mock,
     )
 
 

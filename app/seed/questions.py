@@ -370,8 +370,9 @@ def seed(db=None) -> None:
             return
 
         for qdata in SEED_QUESTIONS:
-            rubrics_data = qdata.pop("rubrics")
-            q = Question(**qdata)
+            qdata_copy = dict(qdata)           # don't mutate the module-level list
+            rubrics_data = qdata_copy.pop("rubrics")
+            q = Question(**qdata_copy)
             db.add(q)
             db.flush()
 

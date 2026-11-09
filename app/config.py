@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # Content only — audits are skipped to keep per-response latency low.
     audit_inline: bool = False
 
+    # Name of the judge to use for the interview UI (must match a JUDGE_N_NAME
+    # in .env). If unset or the judge is not found, the app refuses to start
+    # in real mode. In mock mode this setting is ignored.
+    ui_judge: str = ""
+
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5
     filler_words: str = "um,uh,like,you know,so,basically,actually,literally"

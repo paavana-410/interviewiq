@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<div class="mock-banner" id="mockBanner">⚠ DEMO MODE: mock scores, not real evaluation.</div>
+<div class="mock-banner" id="mockBanner">⚠ DEMO MODE: scores, transcript, WPM and filler figures are all fake. Not real evaluation.</div>
 
 <div class="card" id="mainCard">
   <div class="progress" id="progress">Loading…</div>
@@ -139,13 +139,17 @@
     const wpm=r.wpm?r.wpm.toFixed(0):"—";
     const fillers=r.filler_density?r.filler_density.toFixed(1):"0";
     const duration=r.duration_sec?r.duration_sec.toFixed(1):"—";
+    const isSynth=(r.transcript_source==="synthetic");
+    const transcriptLabel=isSynth?"SYNTHETIC TRANSCRIPT (demo)":"Transcript";
+    const scoreLabel=isSynth
+      ?"Content score: "+score+"% ⚠ fake  WPM: "+wpm+" ⚠ fake  Fillers: "+fillers+" ⚠ fake  Duration: "+duration+"s ⚠ fake"
+      :"Content score: "+score+"%  WPM: "+wpm+"  Fillers/100w: "+fillers+"  Duration: "+duration+"s";
     const t=document.getElementById("transcript");
-    t.innerHTML=`<strong>Transcript:</strong> ${escHtml(r.transcript||"(empty)")}<br><br>`
-      +`<strong>Content score: ${score}%</strong>&nbsp;&nbsp;`
-      +`WPM: ${wpm}&nbsp;&nbsp;Fillers/100w: ${fillers}&nbsp;&nbsp;Duration: ${duration}s`
+    t.innerHTML=`<strong>${escHtml(transcriptLabel)}:</strong> ${escHtml(r.transcript||"(empty)")}<br><br>`
+      +scoreLabel
       +(r.uncertainty?`<br><em>⚠ Low-confidence evaluation</em>`:"");
     t.style.display="block";
-    setStatus(`✓ Evaluated  (score: ${score}%)`);
+    setStatus(`✓ Evaluated  (score: ${score}%)`+(isSynth?" — demo only":""));
     document.getElementById("nextBtn").style.display="inline-block";
   }
 

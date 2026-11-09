@@ -36,7 +36,7 @@
 </head>
 <body>
 <div class="container">
-  <div class="mock-banner" id="mockBanner">⚠ DEMO MODE: mock scores, not real evaluation.</div>
+  <div class="mock-banner" id="mockBanner">⚠ DEMO MODE: scores, transcripts, WPM and filler figures are all fake — not real evaluation.</div>
   <div class="real-banner" id="realBanner" id="realBanner"></div>
   <h1>Your Interview Results</h1>
   <div id="content"><div class="loading">Loading results…</div></div>
@@ -124,7 +124,7 @@
         </div>
 
         <div class="section">
-          <div class="section-title">Transcript</div>
+          <div class="section-title">Transcript${data.is_mock?' <span style="color:#d9534f;font-size:.75rem">(SYNTHETIC — demo)</span>':''}</div>
           <div class="transcript">${esc(a.transcript||"(no transcript)")}</div>
         </div>
       </div>`;

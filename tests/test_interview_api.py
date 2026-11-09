@@ -200,3 +200,203 @@ def test_judge_info_mock(client):
     assert "model" in d
     assert "is_mock" in d
     assert d["is_mock"] is True   # we're in mock mode
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# New tests: UI_JUDGE, Whisper guard, synthetic transcript per-question
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_submit_response_returns_transcript_source_synthetic_in_mock(client):
+    """In mock mode the response must include transcript_source='synthetic'."""
+    s = client.post("/interview/sessions", json={"mode": "mixed", "n_questions": 2}).json()
+    sid = s["session_id"]
+    nq = client.get(f"/interview/sessions/{sid}/next-question").json()
+    qid = nq["question_id"]
+    r = client.post(
+        f"/interview/sessions/{sid}/responses?question_id={qid}",
+        files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+    )
+    assert r.status_code == 201
+    d = r.json()
+    assert d["transcript_source"] == "synthetic"
+    assert d["is_mock"] is True
+
+
+def test_synthetic_transcripts_differ_per_question(client):
+    """Two different questions must produce different synthetic transcripts."""
+    s = client.post("/interview/sessions", json={"mode": "mixed", "n_questions": 4}).json()
+    sid = s["session_id"]
+    transcripts = []
+    for _ in range(2):
+        nq = client.get(f"/interview/sessions/{sid}/next-question").json()
+        if nq["done"]:
+            break
+        qid = nq["question_id"]
+        r = client.post(
+            f"/interview/sessions/{sid}/responses?question_id={qid}",
+            files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+        )
+        assert r.status_code == 201
+        transcripts.append(r.json()["transcript"])
+    # Two distinct questions → two distinct synthetic transcripts
+    assert len(transcripts) == 2
+    assert transcripts[0] != transcripts[1], (
+        "synthetic transcripts must differ per question"
+    )
+
+
+def test_synthetic_transcript_labelled(client):
+    """Synthetic transcript text must start with [SYNTHETIC TRANSCRIPT (demo)]."""
+    s = client.post("/interview/sessions", json={"mode": "mixed", "n_questions": 2}).json()
+    sid = s["session_id"]
+    nq = client.get(f"/interview/sessions/{sid}/next-question").json()
+    qid = nq["question_id"]
+    r = client.post(
+        f"/interview/sessions/{sid}/responses?question_id={qid}",
+        files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+    )
+    d = r.json()
+    assert d["transcript"].startswith("[SYNTHETIC TRANSCRIPT (demo)]"), (
+        f"expected synthetic prefix, got: {d['transcript'][:60]}"
+    )
+
+
+def test_ui_judge_not_configured_returns_503():
+    """In real (non-mock) mode with UI_JUDGE unset, submit must return 503."""
+    import os as _os
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    # Stand up a separate real-mode client
+    _os.environ["LLM_PROVIDER"] = "live"
+    _os.environ["UI_JUDGE"] = ""   # explicitly unset
+
+    # Reset the settings singleton so it picks up the change
+    import app.config as _cfg
+    _cfg._settings = None
+
+    from app.main import create_app
+    from app.database import Base, get_db
+
+    _engine2 = create_engine(
+        "sqlite:///./test_ui_judge.db",
+        connect_args={"check_same_thread": False},
+    )
+    _SL2 = sessionmaker(autocommit=False, autoflush=False, bind=_engine2)
+    Base.metadata.create_all(bind=_engine2)
+    from app.seed.questions import seed
+    seed(db=_SL2())
+
+    def _db2():
+        db = _SL2()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    _app2 = create_app()
+    _app2.dependency_overrides[get_db] = _db2
+
+    try:
+        with TestClient(_app2, raise_server_exceptions=False) as c2:
+            # Create session
+            s = c2.post("/interview/sessions", json={"mode": "mixed", "n_questions": 2})
+            sid = s.json()["session_id"]
+            nq = c2.get(f"/interview/sessions/{sid}/next-question").json()
+            qid = nq["question_id"]
+            r = c2.post(
+                f"/interview/sessions/{sid}/responses?question_id={qid}",
+                files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+            )
+            assert r.status_code == 503, f"expected 503, got {r.status_code}: {r.text[:200]}"
+            assert "UI_JUDGE" in r.json().get("detail", ""), (
+                "error detail must mention UI_JUDGE"
+            )
+    finally:
+        # Restore mock mode so other tests are unaffected
+        _os.environ["LLM_PROVIDER"] = "mock"
+        _os.environ.pop("UI_JUDGE", None)
+        _cfg._settings = None
+        Base.metadata.drop_all(bind=_engine2)
+        _engine2.dispose()
+        import time
+        for _ in range(5):
+            try:
+                _os.remove("test_ui_judge.db")
+                break
+            except (PermissionError, FileNotFoundError):
+                time.sleep(0.2)
+
+
+def test_whisper_unavailable_returns_503(monkeypatch):
+    """In real mode with Whisper not installed, submit must return 503
+    with 'speech recognition unavailable' in the detail."""
+    import app.orchestration.slim_pipeline as _sp
+    # Patch _whisper_installed to return False for this test
+    monkeypatch.setattr(_sp, "_whisper_installed", lambda: False)
+
+    # Also patch _get_ui_llm_service to not raise UIJudgeNotConfigured
+    from app.services.llm import MockLLMService
+    monkeypatch.setattr(_sp, "_get_ui_llm_service", lambda: MockLLMService())
+
+    # Temporarily switch to real mode
+    import app.config as _cfg
+    _orig = _cfg._settings
+    import os as _os
+    _os.environ["LLM_PROVIDER"] = "live"
+    _cfg._settings = None
+
+    from app.database import get_db
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.database import Base
+    from app.main import create_app
+
+    _engine3 = create_engine(
+        "sqlite:///./test_whisper_guard.db",
+        connect_args={"check_same_thread": False},
+    )
+    _SL3 = sessionmaker(autocommit=False, autoflush=False, bind=_engine3)
+    Base.metadata.create_all(bind=_engine3)
+    from app.seed.questions import seed
+    seed(db=_SL3())
+
+    def _db3():
+        db = _SL3()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    _app3 = create_app()
+    _app3.dependency_overrides[get_db] = _db3
+
+    try:
+        with TestClient(_app3, raise_server_exceptions=False) as c3:
+            s = c3.post("/interview/sessions", json={"mode": "mixed", "n_questions": 2})
+            sid = s.json()["session_id"]
+            nq = c3.get(f"/interview/sessions/{sid}/next-question").json()
+            qid = nq["question_id"]
+            r = c3.post(
+                f"/interview/sessions/{sid}/responses?question_id={qid}",
+                files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+            )
+            assert r.status_code == 503, f"expected 503, got {r.status_code}: {r.text[:200]}"
+            detail = r.json().get("detail", "")
+            assert "speech recognition unavailable" in detail.lower(), (
+                f"expected 'speech recognition unavailable' in detail, got: {detail}"
+            )
+    finally:
+        _os.environ["LLM_PROVIDER"] = "mock"
+        _cfg._settings = None
+        Base.metadata.drop_all(bind=_engine3)
+        _engine3.dispose()
+        import time
+        for _ in range(5):
+            try:
+                _os.remove("test_whisper_guard.db")
+                break
+            except (PermissionError, FileNotFoundError):
+                time.sleep(0.2)
