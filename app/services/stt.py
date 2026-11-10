@@ -63,11 +63,34 @@ class WhisperSTTService(STTService):
     """faster-whisper backed STT with word-level timestamps."""
 
     def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8"):
-        # Lazy import so tests that mock STT don't need faster-whisper installed
         from faster_whisper import WhisperModel  # type: ignore
-
+        self._patch_av_open()   # fix metadata_errors incompatibility
         self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         self._model_name = f"faster-whisper-{model_size}"
+
+    @staticmethod
+    def _patch_av_open() -> None:
+        """faster-whisper 1.2+ passes metadata_errors='ignore' to av.open(),
+        but some PyAV builds (e.g. 19.x) don't support that kwarg.
+        Wrap av.open in a Python function that silently drops it.
+
+        Can't use inspect.signature() because av.open is a C built-in.
+        """
+        try:
+            import av as _av
+            if getattr(_av, "_iiq_patched", False):
+                return  # already patched
+
+            _real_open = _av.open
+
+            def _safe_open(*args, **kwargs):
+                kwargs.pop("metadata_errors", None)
+                return _real_open(*args, **kwargs)
+
+            _av.open = _safe_open
+            _av._iiq_patched = True
+        except Exception:
+            pass
 
     def transcribe(self, audio_path: str | Path) -> TranscriptResult:
         segments, info = self._model.transcribe(
