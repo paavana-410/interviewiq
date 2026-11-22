@@ -381,6 +381,13 @@
       </div>
       ${subs.map((s, idx) => {
         const scoreColor = s.score_percent >= 70 ? "#1BA94C" : s.score_percent >= 40 ? "#F5A623" : "#EA3920";
+        const titleMap = {
+          "two_sum": "Two Sum (Target Pair Indices)",
+          "valid_parentheses": "Valid Parentheses (Stack)",
+          "sql_department_top_salary": "Department Salary Filter (SQL)",
+          "sql_customer_orders_total": "Customer Spending Total (SQL JOIN)"
+        };
+        const chalTitle = titleMap[s.challenge_id] || s.challenge_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         return `
           <div class="card" style="border-left:4px solid ${scoreColor};margin-bottom:1.2rem;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
@@ -388,7 +395,7 @@
                 <span class="sec-tag" style="background:#0D141E;color:#00EA64;font-family:'Source Code Pro',monospace;margin-right:0.5rem;">
                   ${esc((s.language || 'code').toUpperCase())}
                 </span>
-                <strong style="font-size:1.05rem;color:var(--text);">${esc(s.challenge_id === 'two_sum' ? 'Two Sum (Target Pair Indices)' : 'Department Salary Filter (SQL)')}</strong>
+                <strong style="font-size:1.05rem;color:var(--text);">${esc(chalTitle)}</strong>
               </div>
               <div style="font-family:'Source Code Pro',monospace;font-weight:800;font-size:1.15rem;color:${scoreColor};">
                 Score: ${s.score_percent}% (${s.passed_tests}/${s.total_tests} Tests Passed)

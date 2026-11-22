@@ -94,6 +94,7 @@ CHALLENGES = {
             )
         },
         "entrypoint": "two_sum",
+        "js_entrypoint": "twoSum",
         "test_cases": [
             # 3 Open Test Cases (Visible in UI)
             TestCase(
@@ -288,6 +289,275 @@ CHALLENGES = {
                 explanation="Only Executive reaches threshold."
             ),
         ]
+    },
+    "valid_parentheses": {
+        "id": "valid_parentheses",
+        "title": "Valid Parentheses (Stack)",
+        "type": "code",
+        "difficulty": "Easy",
+        "category": "Data Structures & Stacks",
+        "description": (
+            "Given a string <code>s</code> containing just the characters <code>'('</code>, <code>')'</code>, "
+            "<code>'{'</code>, <code>'}'</code>, <code>'['</code> and <code>']'</code>, determine if the input string is valid.<br/><br/>"
+            "An input string is valid if:<br/>"
+            "1. Open brackets must be closed by the same type of brackets.<br/>"
+            "2. Open brackets must be closed in the correct order.<br/>"
+            "3. Every close bracket has a corresponding open bracket of the same type."
+        ),
+        "constraints": [
+            "1 &le; s.length &le; 10<sup>4</sup>",
+            "<code>s</code> consists of parentheses only: <code>'()[]{}'</code>."
+        ],
+        "starter_code": {
+            "python": (
+                "def is_valid(s: str) -> bool:\n"
+                "    # Return True if s has valid balanced parentheses, else False\n"
+                "    stack = []\n"
+                "    mapping = {')': '(', '}': '{', ']': '['}\n"
+                "    for char in s:\n"
+                "        if char in mapping.values():\n"
+                "            stack.append(char)\n"
+                "        elif char in mapping:\n"
+                "            if not stack or stack.pop() != mapping[char]:\n"
+                "                return False\n"
+                "        else:\n"
+                "            return False\n"
+                "    return len(stack) == 0\n"
+            ),
+            "javascript": (
+                "function isValid(s) {\n"
+                "    // Return true if s has valid balanced parentheses, else false\n"
+                "    const stack = [];\n"
+                "    const map = { ')': '(', '}': '{', ']': '[' };\n"
+                "    for (const char of s) {\n"
+                "        if (char === '(' || char === '{' || char === '[') {\n"
+                "            stack.push(char);\n"
+                "        } else if (map[char]) {\n"
+                "            if (stack.pop() !== map[char]) return false;\n"
+                "        }\n"
+                "    }\n"
+                "    return stack.length === 0;\n"
+                "}\n"
+            )
+        },
+        "entrypoint": "is_valid",
+        "js_entrypoint": "isValid",
+        "test_cases": [
+            TestCase(
+                id=1,
+                name="Test Case 1 (Single Pair)",
+                input_display="s = '()'",
+                expected_display="true",
+                input_data={"s": "()"},
+                expected_data=True,
+                is_hidden=False,
+                explanation="Open bracket is immediately closed by the same type."
+            ),
+            TestCase(
+                id=2,
+                name="Test Case 2 (Multiple Sequential)",
+                input_display="s = '()[]{}'",
+                expected_display="true",
+                input_data={"s": "()[]{}"},
+                expected_data=True,
+                is_hidden=False,
+                explanation="All pairs match and are properly closed sequentially."
+            ),
+            TestCase(
+                id=3,
+                name="Test Case 3 (Mismatched Pair)",
+                input_display="s = '(]'",
+                expected_display="false",
+                input_data={"s": "(]"},
+                expected_data=False,
+                is_hidden=False,
+                explanation="Round bracket closed with square bracket."
+            ),
+            TestCase(
+                id=4,
+                name="Hidden Test Case 1 (Interleaved Improper)",
+                input_display="[Hidden dataset 1]",
+                expected_display="[Hidden]",
+                input_data={"s": "([)]"},
+                expected_data=False,
+                is_hidden=True,
+                explanation="Closing order is wrong: '[' is closed by ')'."
+            ),
+            TestCase(
+                id=5,
+                name="Hidden Test Case 2 (Nested Symmetrical)",
+                input_display="[Hidden dataset 2]",
+                expected_display="[Hidden]",
+                input_data={"s": "{[]}"},
+                expected_data=True,
+                is_hidden=True,
+                explanation="Proper nested closing of square inside curly brackets."
+            ),
+            TestCase(
+                id=6,
+                name="Hidden Test Case 3 (Single Close Bracket Edge)",
+                input_display="[Hidden dataset 3]",
+                expected_display="[Hidden]",
+                input_data={"s": "]"},
+                expected_data=False,
+                is_hidden=True,
+                explanation="Close bracket with empty stack returns False."
+            ),
+        ]
+    },
+    "sql_customer_orders_total": {
+        "id": "sql_customer_orders_total",
+        "title": "Customer Spending Total (SQL JOIN)",
+        "type": "sql",
+        "difficulty": "Easy-Medium",
+        "category": "Database & SQL",
+        "description": (
+            "You are given two tables: <code>customers</code> and <code>orders</code> with schemas:<br/>"
+            "<pre style='background:#F8FAFA;padding:0.6rem;border-radius:4px;margin:0.5rem 0;'>"
+            "customers(id INT, name VARCHAR, city VARCHAR)\n"
+            "orders(id INT, customer_id INT, amount INT, status VARCHAR)</pre>"
+            "Write a SQL query that joins the tables and returns the customer <code>name</code>, <code>city</code>, "
+            "and their total spending as <code>total_spent</code> (sum of order amounts) for all orders where <code>status = 'completed'</code>.<br/><br/>"
+            "Only include customers whose total completed spending is <strong>greater than or equal to 150</strong>.<br/>"
+            "Order results by <code>total_spent</code> <strong>DESCENDING</strong>, and then by <code>name</code> <strong>ASCENDING</strong>."
+        ),
+        "constraints": [
+            "Use standard SQL / SQLite compatible syntax.",
+            "Column names in result must be <code>name</code>, <code>city</code>, and <code>total_spent</code>.",
+            "Order by <code>total_spent</code> DESC, then <code>name</code> ASC."
+        ],
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL solution below\n"
+                "SELECT c.name, c.city, SUM(o.amount) AS total_spent\n"
+                "FROM customers c\n"
+                "JOIN orders o ON c.id = o.customer_id\n"
+                "WHERE o.status = 'completed'\n"
+                "GROUP BY c.id, c.name, c.city\n"
+                "HAVING SUM(o.amount) >= 150\n"
+                "ORDER BY total_spent DESC, c.name ASC;\n"
+            )
+        },
+        "entrypoint": "sql",
+        "test_cases": [
+            TestCase(
+                id=1,
+                name="Test Case 1 (Standard Active Orders)",
+                input_display="Multi-order customer dataset",
+                expected_display="[['Alice', 'New York', 250], ['Bob', 'San Francisco', 180]]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES
+                      (1, 'Alice', 'New York'),
+                      (2, 'Bob', 'San Francisco'),
+                      (3, 'Charlie', 'Austin');
+                    INSERT INTO orders VALUES
+                      (101, 1, 150, 'completed'),
+                      (102, 1, 100, 'completed'),
+                      (103, 2, 180, 'completed'),
+                      (104, 3, 90, 'completed');
+                """,
+                expected_data=[["Alice", "New York", 250], ["Bob", "San Francisco", 180]],
+                is_hidden=False,
+                explanation="Alice (250) and Bob (180) exceed 150. Charlie (90) is excluded."
+            ),
+            TestCase(
+                id=2,
+                name="Test Case 2 (Filtering Out Pending/Cancelled Orders)",
+                input_display="Orders with non-completed statuses",
+                expected_display="[['David', 'Seattle', 200]]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES
+                      (1, 'David', 'Seattle'),
+                      (2, 'Emma', 'Chicago');
+                    INSERT INTO orders VALUES
+                      (101, 1, 200, 'completed'),
+                      (102, 2, 500, 'pending'),
+                      (103, 2, 50, 'completed');
+                """,
+                expected_data=[["David", "Seattle", 200]],
+                is_hidden=False,
+                explanation="Emma's 500 order is pending, only 50 completed, so she is filtered out (< 150)."
+            ),
+            TestCase(
+                id=3,
+                name="Test Case 3 (Exact 150 Threshold)",
+                input_display="Customer with exactly 150 completed spending",
+                expected_display="[['Grace', 'Boston', 150]]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES
+                      (1, 'Grace', 'Boston'),
+                      (2, 'Henry', 'Denver');
+                    INSERT INTO orders VALUES
+                      (101, 1, 75, 'completed'),
+                      (102, 1, 75, 'completed'),
+                      (103, 2, 149, 'completed');
+                """,
+                expected_data=[["Grace", "Boston", 150]],
+                is_hidden=False,
+                explanation="Grace meets the >= 150 boundary exactly; Henry is at 149 and excluded."
+            ),
+            TestCase(
+                id=4,
+                name="Hidden Test Case 1 (Empty Result Set)",
+                input_display="[Hidden dataset 1]",
+                expected_display="[Hidden]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES (1, 'Ian', 'Miami');
+                    INSERT INTO orders VALUES (101, 1, 100, 'cancelled');
+                """,
+                expected_data=[],
+                is_hidden=True,
+                explanation="No completed orders, empty result set."
+            ),
+            TestCase(
+                id=5,
+                name="Hidden Test Case 2 (Alphabetical Tie-Break)",
+                input_display="[Hidden dataset 2: Equal spending]",
+                expected_display="[Hidden]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES
+                      (1, 'Zoe', 'Dallas'),
+                      (2, 'Adam', 'Atlanta');
+                    INSERT INTO orders VALUES
+                      (101, 1, 300, 'completed'),
+                      (102, 2, 300, 'completed');
+                """,
+                expected_data=[["Adam", "Atlanta", 300], ["Zoe", "Dallas", 300]],
+                is_hidden=True,
+                explanation="Adam and Zoe both spent 300; sorted alphabetically by name (Adam before Zoe)."
+            ),
+            TestCase(
+                id=6,
+                name="Hidden Test Case 3 (Multi-order Aggregation Edge)",
+                input_display="[Hidden dataset 3]",
+                expected_display="[Hidden]",
+                input_data="""
+                    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+                    CREATE TABLE orders (id INT, customer_id INT, amount INT, status TEXT);
+                    INSERT INTO customers VALUES
+                      (1, 'Maya', 'San Jose'),
+                      (2, 'Liam', 'Portland');
+                    INSERT INTO orders VALUES
+                      (101, 1, 50, 'completed'),
+                      (102, 1, 60, 'completed'),
+                      (103, 1, 70, 'completed'),
+                      (104, 2, 10, 'completed');
+                """,
+                expected_data=[["Maya", "San Jose", 180]],
+                is_hidden=True,
+                explanation="Maya has 50+60+70 = 180 >= 150."
+            ),
+        ]
     }
 }
 
@@ -466,6 +736,150 @@ if __name__ == '__main__':
     return results
 
 
+def _run_javascript_tests(source_code: str, test_cases: List[TestCase], entrypoint: str) -> List[TestCaseResult]:
+    """Execute JavaScript code (Node.js) against test cases in an isolated subprocess."""
+    import time
+
+    results = []
+    script_harness = f"""
+const fs = require('fs');
+
+{source_code}
+
+function __runSuite() {{
+    const inputCases = JSON.parse(fs.readFileSync(0, 'utf-8'));
+    const outResults = [];
+    for (const item of inputCases) {{
+        const args = item.args;
+        try {{
+            let res;
+            if (Array.isArray(args)) {{
+                res = {entrypoint}(...args);
+            }} else if (typeof args === 'object' && args !== null) {{
+                res = {entrypoint}(...Object.values(args));
+            }} else {{
+                res = {entrypoint}(args);
+            }}
+            if (Array.isArray(res) && res.every(x => typeof x === 'number')) {{
+                res = res.slice().sort((a, b) => a - b);
+            }}
+            outResults.push({{ status: 'ok', result: res }});
+        }} catch (e) {{
+            outResults.push({{ status: 'error', error: e.message || String(e) }});
+        }}
+    }}
+    console.log(JSON.stringify(outResults));
+}}
+
+__runSuite();
+"""
+
+    suite_inputs = [{"id": tc.id, "args": tc.input_data} for tc in test_cases]
+    input_json = json.dumps(suite_inputs)
+
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(script_harness)
+        tmp_name = f.name
+
+    start_time = time.time()
+    try:
+        proc = subprocess.run(
+            ["node", tmp_name],
+            input=input_json,
+            text=True,
+            capture_output=True,
+            timeout=4.0
+        )
+        total_time_ms = round((time.time() - start_time) * 1000, 1)
+
+        if proc.returncode != 0:
+            err_msg = proc.stderr.strip() or "JavaScript Syntax / Runtime Error"
+            for tc in test_cases:
+                results.append(TestCaseResult(
+                    test_case_id=tc.id,
+                    name=tc.name,
+                    input_display=tc.input_display,
+                    expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                    actual_display="Error",
+                    passed=False,
+                    status="Runtime Error",
+                    execution_time_ms=total_time_ms,
+                    is_hidden=tc.is_hidden,
+                    error=err_msg
+                ))
+            return results
+
+        outputs = json.loads(proc.stdout.strip())
+        for idx, tc in enumerate(test_cases):
+            out_item = outputs[idx] if idx < len(outputs) else {"status": "error", "error": "No output"}
+            if out_item.get("status") == "error":
+                results.append(TestCaseResult(
+                    test_case_id=tc.id,
+                    name=tc.name,
+                    input_display=tc.input_display,
+                    expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                    actual_display="Error",
+                    passed=False,
+                    status="Runtime Error",
+                    execution_time_ms=round(total_time_ms / max(1, len(test_cases)), 1),
+                    is_hidden=tc.is_hidden,
+                    error=out_item.get("error", "Error")
+                ))
+            else:
+                actual = out_item.get("result")
+                expected = sorted(tc.expected_data) if isinstance(tc.expected_data, list) else tc.expected_data
+                passed = (actual == expected)
+                actual_disp = json.dumps(actual) if not tc.is_hidden or passed else "[Hidden Output]"
+
+                results.append(TestCaseResult(
+                    test_case_id=tc.id,
+                    name=tc.name,
+                    input_display=tc.input_display,
+                    expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                    actual_display=actual_disp,
+                    passed=passed,
+                    status="Passed" if passed else "Wrong Answer",
+                    execution_time_ms=round(total_time_ms / max(1, len(test_cases)), 1),
+                    is_hidden=tc.is_hidden
+                ))
+
+    except subprocess.TimeoutExpired:
+        for tc in test_cases:
+            results.append(TestCaseResult(
+                test_case_id=tc.id,
+                name=tc.name,
+                input_display=tc.input_display,
+                expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                actual_display="Time Limit Exceeded",
+                passed=False,
+                status="Time Limit Exceeded",
+                execution_time_ms=4000.0,
+                is_hidden=tc.is_hidden,
+                error="Execution timed out (> 4.0s). Check for infinite loops."
+            ))
+    except Exception as e:
+        for tc in test_cases:
+            results.append(TestCaseResult(
+                test_case_id=tc.id,
+                name=tc.name,
+                input_display=tc.input_display,
+                expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                actual_display="Error",
+                passed=False,
+                status="Runtime Error",
+                execution_time_ms=0.0,
+                is_hidden=tc.is_hidden,
+                error=str(e)
+            ))
+    finally:
+        try:
+            os.remove(tmp_name)
+        except Exception:
+            pass
+
+    return results
+
+
 def _run_sql_tests(query: str, test_cases: List[TestCase]) -> List[TestCaseResult]:
     """Execute SQL query against test case SQLite in-memory databases."""
     import time
@@ -538,6 +952,8 @@ def execute_challenge(
 
     if chal["type"] == "sql" or language == "sql":
         results = _run_sql_tests(source_code, cases_to_run)
+    elif language.lower() in ("javascript", "js"):
+        results = _run_javascript_tests(source_code, cases_to_run, chal.get("js_entrypoint", chal.get("entrypoint", "twoSum")))
     else:
         results = _run_python_tests(source_code, cases_to_run, chal.get("entrypoint", "two_sum"))
 

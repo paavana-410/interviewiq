@@ -1210,9 +1210,11 @@
       <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.9rem;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <label style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Challenge Track:</label>
-          <select class="mic-select" id="challengeSelect" onchange="changeChallenge(this.value)" style="min-width:240px;font-weight:600;">
+          <select class="mic-select" id="challengeSelect" onchange="changeChallenge(this.value)" style="min-width:260px;font-weight:600;">
             <option value="two_sum">Two Sum (Python / JS) · Algorithms</option>
+            <option value="valid_parentheses">Valid Parentheses (Python / JS) · Stack</option>
             <option value="sql_department_top_salary">Department Salary Filter · SQL</option>
+            <option value="sql_customer_orders_total">Customer Spending Total · SQL JOIN</option>
           </select>
         </div>
         <div style="display:flex;align-items:center;gap:0.6rem;">
@@ -2590,7 +2592,8 @@
         body: JSON.stringify({
           challenge_id: currentChallengeId,
           language: currentLanguage,
-          source_code: editor.value
+          source_code: editor.value,
+          session_id: sid
         })
       });
       const data = await r.json();

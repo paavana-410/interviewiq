@@ -101,7 +101,8 @@ def test_next_question_first(client):
     d = r.json()
     assert d["done"] is False
     assert d["question_text"]
-    assert d["question_number"] == 1
+    assert d["question_number"] == 0
+    assert d["is_intro"] is True
     assert d["total_questions"] == s["n_questions"]
 
 
@@ -164,18 +165,27 @@ def test_session_summary_empty(client):
 
 
 def test_session_summary_after_answer(client):
-    """After submitting one answer, summary contains that answer."""
+    """After submitting answers, summary contains introduction and answers."""
     s = client.post("/interview/sessions", json={"mode": "mixed", "n_questions": 2}).json()
     sid = s["session_id"]
-    nq = client.get(f"/interview/sessions/{sid}/next-question").json()
-    qid = nq["question_id"]
+    # 1. Intro question
+    nq1 = client.get(f"/interview/sessions/{sid}/next-question").json()
+    qid1 = nq1["question_id"]
     client.post(
-        f"/interview/sessions/{sid}/responses?question_id={qid}",
-        files={"audio": ("t.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+        f"/interview/sessions/{sid}/responses?question_id={qid1}",
+        files={"audio": ("t1.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
+    )
+    # 2. First core question
+    nq2 = client.get(f"/interview/sessions/{sid}/next-question").json()
+    qid2 = nq2["question_id"]
+    client.post(
+        f"/interview/sessions/{sid}/responses?question_id={qid2}",
+        files={"audio": ("t2.wav", io.BytesIO(b"RIFF" + b"\x00" * 100), "audio/wav")},
     )
     r = client.get(f"/interview/sessions/{sid}/summary")
     assert r.status_code == 200
     d = r.json()
+    assert d["introduction"] is not None
     assert len(d["answers"]) == 1
     ans = d["answers"][0]
     assert "overall_score" in ans
@@ -271,6 +281,7 @@ def test_ui_judge_not_configured_returns_503():
     # Stand up a separate real-mode client
     _os.environ["LLM_PROVIDER"] = "live"
     _os.environ["UI_JUDGE"] = ""   # explicitly unset
+    _os.environ["UI_JUDGE_ROUTER"] = "static"
 
     # Reset the settings singleton so it picks up the change
     import app.config as _cfg
@@ -317,6 +328,7 @@ def test_ui_judge_not_configured_returns_503():
         # Restore mock mode so other tests are unaffected
         _os.environ["LLM_PROVIDER"] = "mock"
         _os.environ.pop("UI_JUDGE", None)
+        _os.environ.pop("UI_JUDGE_ROUTER", None)
         _cfg._settings = None
         Base.metadata.drop_all(bind=_engine2)
         _engine2.dispose()

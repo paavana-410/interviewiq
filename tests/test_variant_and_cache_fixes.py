@@ -144,7 +144,7 @@ class _CallCountingLLM(MockLLMService):
         self._model = "counting-mock"
 
     def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
-                 prompt_version="v1", run_index=None):
+                 prompt_version="v1", run_index=None, bypass_cache=False, **kwargs):
         self.call_count += 1
         # Return a valid rubric eval JSON with a score that depends on run_index
         # so we can confirm each call produced a distinct value.
@@ -213,7 +213,7 @@ class _ReverseOrderLLM(MockLLMService):
         self._call_idx = 0
 
     def complete(self, prompt, *, temperature=0.0, max_tokens=2048,
-                 prompt_version="v1", run_index=None):
+                 prompt_version="v1", run_index=None, bypass_cache=False, **kwargs):
         self._call_idx += 1
         # Return increasing scores per call, so the order is arbitrary here.
         # We instead key off the prompt content to assign scores: if the prompt

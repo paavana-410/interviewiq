@@ -749,6 +749,7 @@ class CodeRunRequest(BaseModel):
     challenge_id: str
     language: str
     source_code: str
+    session_id: int | None = None
 
 
 class CodeSubmitRequest(BaseModel):
@@ -774,8 +775,28 @@ def get_code_challenge(challenge_id: str):
 
 
 @router.post("/code/run")
-def run_code(body: CodeRunRequest):
+def run_code(body: CodeRunRequest, db: Session = Depends(get_db)):
     from app.services.code_executor import execute_challenge
+
+    if body.session_id is not None:
+        session = db.get(InterviewSession, body.session_id)
+        if session:
+            meta = getattr(session, "meta_json", None) or {}
+            if isinstance(meta, str):
+                try:
+                    meta = json.loads(meta)
+                except Exception:
+                    meta = {}
+            runs = meta.get("code_run_count", 0)
+            if runs >= 15:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Rate limit reached: Maximum 15 test runs per session reached. Please review your solution and Submit."
+                )
+            meta["code_run_count"] = runs + 1
+            session.meta_json = meta
+            db.commit()
+
     try:
         return execute_challenge(
             challenge_id=body.challenge_id,
