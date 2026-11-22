@@ -689,6 +689,8 @@ if __name__ == '__main__':
 
         if proc.returncode != 0:
             err_msg = proc.stderr.strip() or "Syntax / Runtime Error"
+            is_syntax = "SyntaxError" in err_msg or "IndentationError" in err_msg or "TabError" in err_msg
+            status_label = "Compilation Error" if is_syntax else "Runtime Error"
             for tc in test_cases:
                 results.append(TestCaseResult(
                     test_case_id=tc.id,
@@ -697,7 +699,7 @@ if __name__ == '__main__':
                     expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
                     actual_display="Error",
                     passed=False,
-                    status="Runtime Error",
+                    status=status_label,
                     execution_time_ms=total_time_ms,
                     is_hidden=tc.is_hidden,
                     error=err_msg
@@ -833,6 +835,8 @@ __runSuite();
 
         if proc.returncode != 0:
             err_msg = proc.stderr.strip() or "JavaScript Syntax / Runtime Error"
+            is_syntax = "SyntaxError" in err_msg
+            status_label = "Compilation Error" if is_syntax else "Runtime Error"
             for tc in test_cases:
                 results.append(TestCaseResult(
                     test_case_id=tc.id,
@@ -841,7 +845,7 @@ __runSuite();
                     expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
                     actual_display="Error",
                     passed=False,
-                    status="Runtime Error",
+                    status=status_label,
                     execution_time_ms=total_time_ms,
                     is_hidden=tc.is_hidden,
                     error=err_msg
@@ -1152,17 +1156,19 @@ def _run_sql_tests(query: str, test_cases: List[TestCase]) -> List[TestCaseResul
             ))
         except Exception as e:
             dur = round((time.time() - t0) * 1000, 1)
+            err_str = str(e)
+            is_syntax = "syntax error" in err_str.lower() or "near " in err_str.lower() or "unrecognized token" in err_str.lower()
             results.append(TestCaseResult(
                 test_case_id=tc.id,
                 name=tc.name,
                 input_display=tc.input_display,
                 expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
-                actual_display="Error",
+                actual_display="SQL Error",
                 passed=False,
-                status="Runtime Error",
+                status="SQL Syntax Error" if is_syntax else "Runtime Error",
                 execution_time_ms=dur,
                 is_hidden=tc.is_hidden,
-                error=f"SQL Error: {str(e)}"
+                error=f"SQL Error: {err_str}"
             ))
         finally:
             conn.close()

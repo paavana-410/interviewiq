@@ -154,3 +154,29 @@ def test_rate_limiting_runs_per_session():
         assert "Rate limit" in exc_info.value.detail
     finally:
         db.close()
+
+
+def test_syntax_and_compilation_error_classification():
+    # 1. Python Syntax Error
+    bad_python = "def two_sum(nums, target):\n    return [0 1]" # syntax error
+    req1 = CodeRunRequest(challenge_id="two_sum", language="python", source_code=bad_python)
+    res1 = run_code(req1)
+    assert res1["all_passed"] is False
+    assert res1["results"][0]["status"] == "Compilation Error"
+    assert "SyntaxError" in res1["results"][0]["error"]
+
+    # 2. Python Runtime Error (e.g. ZeroDivisionError)
+    runtime_python = "def two_sum(nums, target):\n    return 10 / 0"
+    req2 = CodeRunRequest(challenge_id="two_sum", language="python", source_code=runtime_python)
+    res2 = run_code(req2)
+    assert res2["all_passed"] is False
+    assert res2["results"][0]["status"] == "Runtime Error"
+    assert "division by zero" in res2["results"][0]["error"].lower()
+
+    # 3. SQL Syntax Error
+    bad_sql = "SELEC * FORM invalid table syntax;;;"
+    req3 = CodeRunRequest(challenge_id="sql_department_top_salary", language="sql", source_code=bad_sql)
+    res3 = run_code(req3)
+    assert res3["all_passed"] is False
+    assert res3["results"][0]["status"] == "SQL Syntax Error"
+    assert "syntax error" in res3["results"][0]["error"].lower()

@@ -2601,9 +2601,17 @@
       if(!r.ok) throw new Error(data.detail || "Run failed");
 
       renderTestResults(data, "run");
-      statusEl.innerHTML = data.all_passed 
-        ? '✅ All 3 Open Test Cases Passed! You can now submit.' 
-        : `⚠️ ${data.passed_tests}/${data.total_tests} Open Test Cases Passed. Review failure below.`;
+      if(data.results && data.results.some(r => r.status === "Compilation Error")){
+        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">❌ Compilation Error: Please fix syntax or type errors in your code.</span>';
+      } else if(data.results && data.results.some(r => r.status === "Runtime Error")){
+        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">❌ Runtime Error: An exception occurred during execution.</span>';
+      } else if(data.results && data.results.some(r => r.status === "Time Limit Exceeded")){
+        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">⏱️ Time Limit Exceeded: Check for infinite loops or non-terminating recursion.</span>';
+      } else {
+        statusEl.innerHTML = data.all_passed 
+          ? '✅ All 3 Open Test Cases Passed! You can now submit.' 
+          : `⚠️ ${data.passed_tests}/${data.total_tests} Open Test Cases Passed. Review failure below.`;
+      }
 
     }catch(err){
       statusEl.innerHTML = `<span style="color:#dc2626;">Error: ${esc(err.message)}</span>`;
@@ -2690,15 +2698,33 @@
     if(!res) return;
 
     const statusColor = res.passed ? "#059669" : "#dc2626";
+    const isError = res.status && (res.status.includes("Error") || res.status.includes("Timeout"));
     detailBox.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-        <span style="font-weight:700;color:var(--text);font-size:0.85rem;">${esc(res.name)} ${res.is_hidden ? '<span style="color:#738F93;font-size:0.75rem;">(Hidden Test Case)</span>' : ''}</span>
-        <span style="font-weight:700;color:${statusColor};">${esc(res.status)} (${res.execution_time_ms} ms)</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.4rem;">
+        <span style="font-weight:700;color:var(--text);font-size:0.85rem;">
+          ${esc(res.name)} ${res.is_hidden ? '<span style="color:#738F93;font-size:0.75rem;">(Hidden Test Case)</span>' : ''}
+        </span>
+        <span style="font-weight:700;color:${statusColor};background:${res.passed?'#EAF8ED':'#FDEBE9'};padding:0.2rem 0.55rem;border-radius:4px;font-size:0.78rem;">
+          ${esc(res.status)} (${res.execution_time_ms} ms)
+        </span>
       </div>
-      <div style="margin-top:0.35rem;"><strong>Input:</strong> ${esc(res.input_display)}</div>
-      <div style="margin-top:0.25rem;"><strong>Expected Output:</strong> ${esc(res.expected_display)}</div>
-      <div style="margin-top:0.25rem;color:${statusColor};"><strong>Your Output:</strong> ${esc(res.actual_display)}</div>
-      ${res.error ? `<div style="margin-top:0.4rem;color:#dc2626;background:#FDEBE9;padding:0.4rem;border-radius:4px;"><strong>Error:</strong> ${esc(res.error)}</div>` : ''}
+      <div style="margin-top:0.35rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;">
+        <strong>Input:</strong> <span style="color:#576871;">${esc(res.input_display)}</span>
+      </div>
+      <div style="margin-top:0.25rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;">
+        <strong>Expected Output:</strong> <span style="color:#059669;">${esc(res.expected_display)}</span>
+      </div>
+      <div style="margin-top:0.25rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;color:${statusColor};">
+        <strong>Your Output:</strong> ${esc(res.actual_display)}
+      </div>
+      ${res.error ? `
+        <div style="margin-top:0.6rem;background:#0D141E;border:1px solid #EA3920;border-radius:6px;padding:0.75rem 0.9rem;">
+          <div style="font-size:0.75rem;font-weight:700;color:#EA3920;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.35rem;">
+            ⚠️ ${esc(res.status || 'Execution Error')} Output
+          </div>
+          <pre style="margin:0;font-family:'Source Code Pro',monospace;font-size:0.8rem;color:#FF8585;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${esc(res.error)}</pre>
+        </div>
+      ` : ''}
     `;
   }
 
