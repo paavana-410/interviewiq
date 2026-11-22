@@ -14,7 +14,21 @@ from app.config import get_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_settings()
+    settings = get_settings()
+    # Pre-warm Whisper in background thread so model stays in memory
+    if settings.llm_provider != "mock":
+        import threading
+        def _warm_whisper():
+            try:
+                from app.services.stt import WhisperSTTService
+                WhisperSTTService(
+                    model_size=settings.whisper_model_size,
+                    device=settings.whisper_device,
+                    compute_type=settings.whisper_compute_type,
+                )
+            except Exception:
+                pass
+        threading.Thread(target=_warm_whisper, daemon=True).start()
     yield
 
 
@@ -49,6 +63,11 @@ def create_app() -> FastAPI:
     static_dir = Path(__file__).parent / "static"
     static_dir.mkdir(exist_ok=True)
     app.mount("/ui", StaticFiles(directory=str(static_dir), html=True), name="ui")
+
+    @app.get("/", include_in_schema=False)
+    def root():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/ui/")
 
     @app.get("/health", tags=["meta"])
     def health():

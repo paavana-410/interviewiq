@@ -29,17 +29,21 @@ def get_engine():
         settings = get_settings()
         url = settings.database_url
         if _is_sqlite(url):
-            # SQLite: no connection pool, single-threaded safe
+            # SQLite: multi-thread safe with 30s busy timeout + WAL mode
             _engine = create_engine(
                 url,
-                connect_args={"check_same_thread": False},
+                connect_args={"check_same_thread": False, "timeout": 30},
                 echo=False,
             )
-            # Enable WAL mode and foreign keys for SQLite
+            # Enable WAL mode, busy timeout, and foreign keys for SQLite
             @event.listens_for(_engine, "connect")
-            def _sqlite_pragmas(conn, _):
-                conn.execute("PRAGMA journal_mode=WAL")
-                conn.execute("PRAGMA foreign_keys=ON")
+            def _sqlite_pragmas(dbapi_conn, _):
+                cursor = dbapi_conn.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
         else:
             _engine = create_engine(
                 url,
@@ -61,10 +65,13 @@ def get_session_local():
 
 
 def get_db():
-    """FastAPI dependency: yields a DB session, closes on exit."""
+    """FastAPI dependency: yields a DB session, rolls back on error, closes on exit."""
     SL = get_session_local()
     db = SL()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

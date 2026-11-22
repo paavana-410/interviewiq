@@ -3,69 +3,469 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>InterviewIQ — Start</title>
+  <title>InterviewIQ — AI Placement Assessment &amp; Mock Interview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Source+Code+Pro:wght@500;600&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;background:#f4f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
-    .card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.1);padding:2.5rem 3rem;max-width:480px;width:100%}
-    h1{font-size:1.8rem;color:#1a1a2e;margin-bottom:.4rem}
-    .sub{color:#666;font-size:.95rem;margin-bottom:2rem;line-height:1.5}
-    label{display:block;font-size:.85rem;font-weight:600;color:#333;margin-bottom:.3rem;margin-top:1.2rem}
-    select,input[type=range]{width:100%;padding:.55rem .75rem;border:1.5px solid #ccd;border-radius:8px;font-size:1rem;background:#fafbff}
-    input[type=range]{padding:0;margin-top:.4rem}
-    .range-row{display:flex;align-items:center;gap:.8rem}
-    .range-row span{font-weight:700;min-width:1.5rem;color:#4361ee}
-    .btn{display:block;width:100%;margin-top:2rem;padding:.85rem;background:#4361ee;color:#fff;border:none;border-radius:8px;font-size:1.05rem;font-weight:600;cursor:pointer;transition:background .2s}
-    .btn:hover{background:#3451d1}
-    .mode-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-top:.4rem}
-    .mode-btn{padding:.7rem;border:2px solid #ccd;border-radius:8px;background:#fafbff;cursor:pointer;font-size:.9rem;font-weight:500;color:#333;text-align:center;transition:all .15s}
-    .mode-btn.active{border-color:#4361ee;background:#ebedff;color:#4361ee}
-    #err{color:#d9534f;font-size:.85rem;margin-top:.8rem;display:none}
+    body{
+      font-family:'Open Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:#F3F7F7;
+      color:#0E141E;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    /* ── Top Navigation Bar (HackerRank Deep Navy Slate) ── */
+    .navbar{
+      background:#0D141E;
+      padding:0 2.5rem;
+      height:58px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      flex-shrink:0;
+      border-bottom:1px solid #1D2432;
+    }
+    .nav-left{
+      display:flex;
+      align-items:center;
+      gap:1.8rem;
+    }
+    .navbar-brand{
+      display:flex;
+      align-items:center;
+      gap:0.65rem;
+      color:#FFFFFF;
+      font-size:1.1rem;
+      font-weight:700;
+      letter-spacing:-0.01em;
+      text-decoration:none;
+    }
+    .navbar-logo{
+      width:30px;
+      height:30px;
+      background:#00EA64;
+      border-radius:6px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#0D141E;
+      font-size:0.95rem;
+      font-weight:800;
+      font-family:'Source Code Pro',monospace;
+    }
+    .nav-links{
+      display:flex;
+      align-items:center;
+      gap:1.4rem;
+    }
+    .nav-item{
+      color:#C2C7D0;
+      font-size:0.86rem;
+      font-weight:600;
+      text-decoration:none;
+      transition:color 0.15s;
+    }
+    .nav-item:hover, .nav-item.active{
+      color:#FFFFFF;
+    }
+    .nav-item.active{
+      border-bottom:2px solid #00EA64;
+      padding-bottom:18px;
+      margin-bottom:-18px;
+      color:#00EA64;
+    }
+
+    .nav-right{
+      display:flex;
+      align-items:center;
+      gap:1rem;
+    }
+    .proctor-live-tag{
+      background:#1D2432;
+      border:1px solid #2EC866;
+      color:#2EC866;
+      border-radius:999px;
+      padding:0.3rem 0.8rem;
+      font-size:0.75rem;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      gap:0.4rem;
+    }
+    .live-dot{
+      width:7px;
+      height:7px;
+      border-radius:50%;
+      background:#00EA64;
+      animation:dotPulse 1.5s infinite;
+    }
+    @keyframes dotPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+    /* ── Page Canvas & Centering ── */
+    .page-body{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:2.5rem 1.5rem;
+    }
+
+    /* Main card container */
+    .card{
+      background:#FFFFFF;
+      border:1px solid #E7EEEF;
+      border-radius:8px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+      padding:2.2rem 2.6rem;
+      max-width:580px;
+      width:100%;
+    }
+
+    .card-header-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:0.4rem;
+      font-size:0.75rem;
+      font-weight:700;
+      color:#00A843;
+      background:#EAF8ED;
+      border:1px solid #B4E8C2;
+      padding:0.25rem 0.65rem;
+      border-radius:4px;
+      margin-bottom:0.75rem;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+    }
+
+    h1{
+      font-size:1.55rem;
+      font-weight:700;
+      color:#0E141E;
+      margin-bottom:0.4rem;
+      letter-spacing:-0.01em;
+    }
+
+    .sub{
+      color:#576871;
+      font-size:0.92rem;
+      margin-bottom:1.8rem;
+      line-height:1.55;
+    }
+
+    label{
+      display:block;
+      font-size:0.75rem;
+      font-weight:700;
+      color:#576871;
+      text-transform:uppercase;
+      letter-spacing:0.06em;
+      margin-bottom:0.6rem;
+      margin-top:1.5rem;
+    }
+
+    /* Mode / Domain grid */
+    .grid-3{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:0.65rem;
+    }
+
+    .opt-card{
+      border:1px solid #E7EEEF;
+      border-radius:6px;
+      padding:0.9rem 0.75rem;
+      background:#FFFFFF;
+      cursor:pointer;
+      text-align:center;
+      transition:all 0.15s ease;
+    }
+    .opt-card:hover{
+      border-color:#B4E8C2;
+      background:#F3F7F7;
+    }
+    .opt-card.active{
+      border-color:#2EC866;
+      background:#EAF8ED;
+      box-shadow:0 0 0 1px #2EC866;
+    }
+    .opt-title{
+      font-size:0.92rem;
+      font-weight:700;
+      color:#0E141E;
+    }
+    .opt-card.active .opt-title{
+      color:#0E141E;
+    }
+    .opt-desc{
+      font-size:0.72rem;
+      color:#576871;
+      margin-top:0.25rem;
+      line-height:1.35;
+    }
+
+    /* Difficulty cards (HackerRank Track Style) */
+    .diff-card{
+      border:1px solid #E7EEEF;
+      border-radius:6px;
+      padding:0.85rem 1rem;
+      background:#FFFFFF;
+      cursor:pointer;
+      margin-bottom:0.55rem;
+      transition:all 0.15s ease;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .diff-card:hover{
+      border-color:#C2C7D0;
+      background:#F8FAFA;
+    }
+    .diff-card.active{
+      border-color:#2EC866;
+      background:#EAF8ED;
+      box-shadow:0 0 0 1px #2EC866;
+    }
+
+    .diff-info h4{
+      font-size:0.92rem;
+      font-weight:700;
+      color:#0E141E;
+      display:flex;
+      align-items:center;
+      gap:0.45rem;
+    }
+    .diff-info p{
+      font-size:0.78rem;
+      color:#576871;
+      margin-top:0.2rem;
+    }
+
+    /* Difficulty level dots */
+    .diff-dot{
+      display:inline-block;
+      width:9px;
+      height:9px;
+      border-radius:50%;
+      flex-shrink:0;
+    }
+    .diff-dot--easy{ background:#1BA94C; }
+    .diff-dot--medium{ background:#F5A623; }
+    .diff-dot--hard{ background:#EA3920; }
+
+    .diff-pill{
+      font-size:0.75rem;
+      font-weight:700;
+      padding:0.25rem 0.65rem;
+      border-radius:4px;
+      background:#E7EEEF;
+      color:#39424E;
+      white-space:nowrap;
+    }
+    .diff-card.active .diff-pill{
+      background:#B4E8C2;
+      color:#0E141E;
+    }
+
+    /* Proctoring Notice Card */
+    .proctor-notice{
+      margin-top:1.3rem;
+      padding:0.85rem 1rem;
+      background:#F8FAFA;
+      border:1px solid #E7EEEF;
+      border-radius:6px;
+      font-size:0.82rem;
+      color:#39424E;
+      display:flex;
+      align-items:flex-start;
+      gap:0.75rem;
+    }
+    .proctor-notice-icon{
+      font-size:1.15rem;
+      flex-shrink:0;
+      margin-top:0.1rem;
+    }
+
+    /* HackerRank Signature Green Primary Button */
+    .btn-start{
+      display:block;
+      width:100%;
+      margin-top:1.8rem;
+      padding:0.9rem;
+      background:#2EC866;
+      color:#FFFFFF;
+      border:none;
+      border-radius:6px;
+      font-family:inherit;
+      font-size:0.98rem;
+      font-weight:700;
+      cursor:pointer;
+      transition:all 0.15s ease;
+      letter-spacing:0.3px;
+      box-shadow:0 1px 2px rgba(0,0,0,0.12);
+      text-align:center;
+    }
+    .btn-start:hover{
+      background:#1BA94C;
+      box-shadow:0 2px 6px rgba(27,169,76,0.28);
+    }
+    .btn-start:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    #err{
+      color:#EA3920;
+      font-size:0.85rem;
+      margin-top:0.8rem;
+      text-align:center;
+      display:none;
+      font-weight:600;
+    }
   </style>
 </head>
 <body>
+
+<!-- ── Top Navigation Bar (HackerRank Deep Navy Slate) ── -->
+<nav class="navbar">
+  <div class="nav-left">
+    <a href="/ui/" class="navbar-brand">
+      <div class="navbar-logo">IQ</div>
+      <span>InterviewIQ</span>
+    </a>
+    <div class="nav-links">
+      <a href="/ui/" class="nav-item active">Practice</a>
+      <a href="#" class="nav-item">Certification</a>
+      <a href="#" class="nav-item">Leaderboard</a>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="proctor-live-tag">
+      <span class="live-dot"></span>
+      <span>Proctored Environment Active</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Page Body ── -->
+<div class="page-body">
 <div class="card">
-  <h1>InterviewIQ</h1>
-  <p class="sub">Practice your placement interview with instant AI feedback on content and delivery.</p>
+  <div class="card-header-badge">Placement Assessment Track</div>
+  <h1>Start Your Technical Assessment</h1>
+  <p class="sub">Configure your virtual interview — structured algorithmic, architectural &amp; behavioral problems with progressive follow-up probes and real-time AI scoring.</p>
 
-  <label>Interview mode</label>
-  <div class="mode-grid" id="modeGrid">
-    <div class="mode-btn active" data-mode="mixed">Mixed</div>
-    <div class="mode-btn" data-mode="behavioral">Behavioural</div>
-    <div class="mode-btn" data-mode="technical">Technical</div>
+  <!-- Category / Mode -->
+  <label>Assessment Domain</label>
+  <div class="grid-3" id="modeGrid">
+    <div class="opt-card active" data-mode="mixed">
+      <div class="opt-title">Mixed Track</div>
+      <div class="opt-desc">HR + Core CS + Behavioral</div>
+    </div>
+    <div class="opt-card" data-mode="behavioral">
+      <div class="opt-title">Behavioral</div>
+      <div class="opt-desc">STAR leadership &amp; team</div>
+    </div>
+    <div class="opt-card" data-mode="technical">
+      <div class="opt-title">Technical</div>
+      <div class="opt-desc">Algorithms, DS &amp; System</div>
+    </div>
   </div>
 
-  <label>Number of questions</label>
-  <div class="range-row">
-    <input type="range" id="nq" min="3" max="6" value="5" step="1"/>
-    <span id="nqVal">5</span>
+  <!-- Difficulty & Follow-Up Structure -->
+  <label>Difficulty Level &amp; Question Depth</label>
+  <div id="diffGrid">
+    <!-- Easy: 5 Questions -->
+    <div class="diff-card active" data-diff="easy">
+      <div class="diff-info">
+        <h4><span class="diff-dot diff-dot--easy"></span> Easy</h4>
+        <p>1 Core Question + 1 Follow-up + 1 Core + 2 Follow-ups</p>
+      </div>
+      <div class="diff-pill">5 Questions</div>
+    </div>
+
+    <!-- Medium: 6 Questions -->
+    <div class="diff-card" data-diff="medium">
+      <div class="diff-info">
+        <h4><span class="diff-dot diff-dot--medium"></span> Medium</h4>
+        <p>3 Core Questions + 3 Targeted Follow-up Probes</p>
+      </div>
+      <div class="diff-pill">6 Questions</div>
+    </div>
+
+    <!-- Hard: 7 Questions -->
+    <div class="diff-card" data-diff="hard">
+      <div class="diff-info">
+        <h4><span class="diff-dot diff-dot--hard"></span> Hard</h4>
+        <p>Deep-dive architecture, distributed edge cases &amp; pressure tests</p>
+      </div>
+      <div class="diff-pill">7 Questions</div>
+    </div>
   </div>
 
-  <button class="btn" id="startBtn">Start Interview →</button>
+  <!-- Proctoring & Environmental Readiness Notice -->
+  <div class="proctor-notice">
+    <span class="proctor-notice-icon">🛡️</span>
+    <div style="line-height:1.45;">
+      <strong>Proctored Environment Active:</strong> Webcam &amp; microphone permissions required. Fullscreen lockdown, eye-gaze tracking, and mobile device detection will be enforced.
+    </div>
+  </div>
+
+  <button class="btn-start" id="startBtn">Enter Interview Room →</button>
   <div id="err"></div>
-</div>
+</div><!-- end card -->
+</div><!-- end page-body -->
 
 <script>
-  let mode = "mixed";
-  document.querySelectorAll(".mode-btn").forEach(b=>{
-    b.onclick=()=>{ document.querySelectorAll(".mode-btn").forEach(x=>x.classList.remove("active")); b.classList.add("active"); mode=b.dataset.mode; };
-  });
-  const nq=document.getElementById("nq"), nqv=document.getElementById("nqVal");
-  nq.oninput=()=>nqv.textContent=nq.value;
+  let selectedMode = "mixed";
+  let selectedDiff = "easy";
 
-  document.getElementById("startBtn").onclick=async()=>{
-    document.getElementById("err").style.display="none";
-    const btn=document.getElementById("startBtn");
-    btn.disabled=true; btn.textContent="Creating session…";
+  // Mode click
+  document.querySelectorAll(".opt-card").forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll(".opt-card").forEach(x => x.classList.remove("active"));
+      el.classList.add("active");
+      selectedMode = el.dataset.mode;
+    };
+  });
+
+  // Difficulty click
+  document.querySelectorAll(".diff-card").forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll(".diff-card").forEach(x => x.classList.remove("active"));
+      el.classList.add("active");
+      selectedDiff = el.dataset.diff;
+    };
+  });
+
+  // Start
+  document.getElementById("startBtn").onclick = async () => {
+    const btn = document.getElementById("startBtn");
+    const err = document.getElementById("err");
+    err.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Setting up interview room…";
+
     try{
-      const r=await fetch("/interview/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,n_questions:+nq.value})});
-      if(!r.ok){const e=await r.json(); throw new Error(e.detail||"Server error");}
-      const {session_id}=await r.json();
-      location.href=`/ui/interview.html?session_id=${session_id}`;
+      const r = await fetch("/interview/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: selectedMode, difficulty: selectedDiff })
+      });
+      if(!r.ok){
+        const e = await r.json();
+        throw new Error(e.detail || "Server error");
+      }
+      const data = await r.json();
+      location.href = `/ui/interview.html?session_id=${data.session_id}`;
     }catch(e){
-      document.getElementById("err").textContent=e.message;
-      document.getElementById("err").style.display="block";
-      btn.disabled=false; btn.textContent="Start Interview →";
+      err.textContent = e.message;
+      err.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Enter Interview Room →";
     }
   };
 </script>

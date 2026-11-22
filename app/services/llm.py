@@ -135,22 +135,26 @@ class _DiskCache:
         self._dir = Path(cache_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
 
-    def _key(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None) -> str:
+    def _key(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None, max_tokens: int | None = None) -> str:
         raw = f"{model}:{prompt_version}:{prompt}"
         if run_index is not None:
             raw = f"{model}:{prompt_version}:run{run_index}:{prompt}"
+        if max_tokens is not None:
+            raw = f"{raw}:max{max_tokens}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def _path(self, key: str) -> Path:
         return self._dir / key[:2] / f"{key}.json"
 
-    def get(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None) -> LLMResponse | None:
-        key = self._key(model, prompt_version, prompt, run_index)
+    def get(self, model: str, prompt_version: str, prompt: str, run_index: int | None = None, max_tokens: int | None = None) -> LLMResponse | None:
+        key = self._key(model, prompt_version, prompt, run_index, max_tokens)
         p = self._path(key)
         if not p.exists():
             return None
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
+            if data.get("finish_reason") == "length":
+                return None  # Never serve truncated outputs from cache
             return LLMResponse(
                 text=data["text"],
                 model_name=data["model_name"],
@@ -164,8 +168,10 @@ class _DiskCache:
         except Exception:
             return None
 
-    def put(self, model: str, prompt_version: str, prompt: str, resp: LLMResponse, run_index: int | None = None) -> None:
-        key = self._key(model, prompt_version, prompt, run_index)
+    def put(self, model: str, prompt_version: str, prompt: str, resp: LLMResponse, run_index: int | None = None, max_tokens: int | None = None) -> None:
+        if resp.finish_reason == "length":
+            return  # Do not save truncated outputs into cache
+        key = self._key(model, prompt_version, prompt, run_index, max_tokens)
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
         data = {
@@ -236,7 +242,7 @@ class OpenAICompatibleService(LLMService):
         bypass_cache: bool = False,
     ) -> LLMResponse:
         if self._cache and temperature == 0.0 and not bypass_cache:
-            cached = self._cache.get(self._model, prompt_version, prompt, run_index)
+            cached = self._cache.get(self._model, prompt_version, prompt, run_index, max_tokens=max_tokens)
             if cached is not None:
                 logger.debug("Cache hit model=%s run_index=%s", self._model, run_index)
                 return cached
@@ -244,14 +250,14 @@ class OpenAICompatibleService(LLMService):
         resp = self._complete_with_retry(prompt, temperature=temperature, max_tokens=max_tokens)
 
         if self._cache and temperature == 0.0 and not bypass_cache:
-            self._cache.put(self._model, prompt_version, prompt, resp, run_index)
+            self._cache.put(self._model, prompt_version, prompt, resp, run_index, max_tokens=max_tokens)
 
         return resp
 
     @retry(
-        retry=retry_if_exception_type((Exception,)),
-        stop=stop_after_attempt(5),
-        wait=wait_exponential_jitter(multiplier=2, max=60, jitter=4),
+        retry=retry_if_exception_type((IOError, TimeoutError)),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential_jitter(multiplier=1, max=3, jitter=1),
         reraise=True,
     )
     def _complete_with_retry(
@@ -270,10 +276,10 @@ class OpenAICompatibleService(LLMService):
 
         t0 = time.monotonic()
         try:
-            with _httpx.Client(timeout=30.0) as client:
+            with _httpx.Client(timeout=15.0) as client:
                 r = client.post(url, headers=self._build_headers(), json=body)
         except _httpx.TimeoutException:
-            raise TimeoutError(f"Request to {self._model} timed out after 30s")
+            raise TimeoutError(f"Request to {self._model} timed out after 15s")
         except _httpx.ConnectError as e:
             raise ConnectionError(f"Cannot connect to {self._base_url}: {e}")
 
@@ -298,13 +304,17 @@ class OpenAICompatibleService(LLMService):
             }
             raise exc_map[r.status_code]
 
-        # Retryable errors
+        # Rate limit & server errors
         if r.status_code in (429, 502, 503, 504):
             try:
                 msg = r.json().get("error", {}).get("message", "")
             except Exception:
                 msg = ""
             safe = mask_secrets_in_text(msg, self._secrets)
+            if "free-models-per-day" in safe or "quota" in safe.lower():
+                # Daily quota exhausted — non-retryable, fail fast so race router falls back instantly
+                logger.warning("Quota exhausted (429) model=%s: %s", self._model, safe[:100])
+                raise ValueError(f"Daily quota exhausted: {safe[:100]}")
             logger.warning("Retryable error %s model=%s: %s", r.status_code, self._model, safe[:100])
             raise IOError(f"HTTP {r.status_code}: {safe[:100]}")
 
@@ -507,6 +517,119 @@ def get_all_judge_services() -> list[tuple[str, LLMService]]:
         (j.name, OpenAICompatibleService(j, cache_dir=cache))
         for j in registry.judges
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dynamic Racing & Fallback Router
+# ─────────────────────────────────────────────────────────────────────────────
+
+import concurrent.futures
+
+_RACE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+
+
+class RacingLLMService(LLMService):
+    """Speculative parallel execution (racing) across top judge candidates.
+
+    Fires requests in parallel to all candidate judges. The first one that returns
+    valid, non-truncated JSON wins immediately and fulfills the evaluation.
+    Provides fast latency, instant fault-tolerance, and automatic failover.
+    """
+
+    def __init__(self, candidates: list[LLMService]):
+        self._candidates = candidates
+        self._last_winner: str = candidates[0].model_name if candidates else "mock"
+
+    @property
+    def model_name(self) -> str:
+        names = [c.model_name.split("/")[-1].split(":")[0] for c in self._candidates]
+        return f"race({'+'.join(names)}) [winner: {self._last_winner.split('/')[-1]}]"
+
+    @property
+    def provider(self) -> str:
+        return "adaptive_race"
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.0,
+        max_tokens: int = 4096,
+        prompt_version: str = "v1",
+        run_index: int | None = None,
+        bypass_cache: bool = False,
+    ) -> LLMResponse:
+        if not self._candidates:
+            return MockLLMService().complete(prompt, temperature=temperature, max_tokens=max_tokens)
+
+        # Race candidates in parallel using shared worker pool
+        futures = {
+            _RACE_EXECUTOR.submit(
+                srv.complete,
+                prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                prompt_version=prompt_version,
+                run_index=run_index,
+                bypass_cache=bypass_cache,
+            ): srv
+            for srv in self._candidates
+        }
+
+        errors = []
+        for fut in concurrent.futures.as_completed(futures):
+            srv = futures[fut]
+            try:
+                resp = fut.result()
+                # Must not be truncated and must contain JSON braces
+                if resp.finish_reason != "length" and "{" in resp.text and "}" in resp.text:
+                    self._last_winner = srv.model_name
+                    logger.info("🏆 Race winner: %s (latency: %sms)", srv.model_name, resp.latency_ms)
+                    return resp
+                else:
+                    logger.warning("Judge %s returned truncated/malformed response in race", srv.model_name)
+            except Exception as exc:
+                logger.warning("Judge %s failed in race: %s", srv.model_name, exc)
+                errors.append((srv.model_name, str(exc)))
+
+        if errors:
+            logger.warning("All raced judges encountered errors (%s) — activating graceful failover judge", errors)
+            fallback = MockLLMService(name="adaptive-failover")
+            self._last_winner = "adaptive-failover"
+            return fallback.complete(prompt, temperature=temperature, max_tokens=max_tokens)
+        raise RuntimeError("No judge produced a valid rubric response")
+
+
+def get_racing_llm_service(judge_names: list[str] | None = None) -> LLMService:
+    """Return a RacingLLMService over configured judges."""
+    from app.config import get_settings
+    settings = get_settings()
+
+    if getattr(settings, "llm_provider", "mock") == "mock":
+        return MockLLMService()
+
+    from app.services.judge_config import get_judge_registry
+    registry = get_judge_registry()
+
+    if judge_names is None:
+        judge_names = ["judge_liquid", "judge_nemotron_lightning", "judge_nemotron_ultra"]
+
+    candidates: list[LLMService] = []
+    cache = _cache_dir()
+    for name in judge_names:
+        try:
+            cfg = registry.get_judge(name)
+            candidates.append(OpenAICompatibleService(cfg, cache_dir=cache))
+        except KeyError:
+            continue
+
+    if not candidates:
+        if registry.judges:
+            candidates = [OpenAICompatibleService(j, cache_dir=cache) for j in registry.judges]
+        else:
+            return MockLLMService()
+
+    return RacingLLMService(candidates)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

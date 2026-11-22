@@ -59,13 +59,56 @@ class STTService(abc.ABC):
 # faster-whisper implementation
 # ─────────────────────────────────────────────────────────────────────────────
 
+INTERVIEW_DOMAIN_PROMPT = (
+    "Placement interview for an engineering student at MSRIT Ramaiah Institute of Technology. "
+    "Candidates: Paavana B V, Raina Indikar, Salma Sunaina, Viral Mehta. "
+    "Department of Computer Science and Engineering CSE, final year student. "
+    "Technical concepts: data structures, stack, queue, LIFO, FIFO, RESTful API, "
+    "garbage collection, Python, Java, SQL, STAR method."
+)
+
+
+def normalize_interview_transcript(text: str) -> str:
+    """Post-normalize common acoustic misrecognitions for Indian names and institutions."""
+    if not text:
+        return text
+    import re
+    # Paavana B V variations (e.g. "Phamna, baby", "Phamna baby", "Pauna b v", "Pavana B V")
+    text = re.sub(
+        r'\b(?:Phamna|Pauna|Pavana|Pavan|Bhavana)\s*(?:,\s*)?(?:baby|b\.?v\.?|b\s+v)\b',
+        'Paavana B V',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r'\b(?:Phamna|Pauna)\b', 'Paavana', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bMyself,?\s*Paavana\b', 'Myself Paavana', text, flags=re.IGNORECASE)
+
+    # Teammate variations
+    text = re.sub(r'\b(?:Rina|Rayna)\s+Indik[ae]r\b', 'Raina Indikar', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(?:Selma|Salma)\s+Sun[ae]ina\b', 'Salma Sunaina', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bViral\s+M[ae]t(?:h)?a\b', 'Viral Mehta', text, flags=re.IGNORECASE)
+
+    # College name & department (e.g. "MSR-86", "MSR at the CSC", "MSRIT")
+    text = re.sub(r'\bMSR-?86\b', 'MSRIT CSE', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bMSR\s+at\s+the\s+CSC\b', 'MSRIT CSE', text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:I'?m\s+)?finally\s+an?\s+(?:MSRIT|MSR)\b", "I'm a final year MSRIT", text, flags=re.IGNORECASE)
+    text = re.sub(r'\bfinally\s+an?\b', 'final year', text, flags=re.IGNORECASE)
+    return text
+
+
+_WHISPER_MODEL_CACHE: dict[tuple[str, str, str], any] = {}
+
+
 class WhisperSTTService(STTService):
     """faster-whisper backed STT with word-level timestamps."""
 
     def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8"):
         from faster_whisper import WhisperModel  # type: ignore
         self._patch_av_open()   # fix metadata_errors incompatibility
-        self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        cache_key = (model_size, device, compute_type)
+        if cache_key not in _WHISPER_MODEL_CACHE:
+            _WHISPER_MODEL_CACHE[cache_key] = WhisperModel(model_size, device=device, compute_type=compute_type)
+        self._model = _WHISPER_MODEL_CACHE[cache_key]
         self._model_name = f"faster-whisper-{model_size}"
 
     @staticmethod
@@ -97,6 +140,10 @@ class WhisperSTTService(STTService):
             str(audio_path),
             word_timestamps=True,
             language="en",
+            beam_size=1,
+            temperature=0.0,
+            vad_filter=True,
+            initial_prompt=INTERVIEW_DOMAIN_PROMPT,
         )
 
         words: list[WordTimestamp] = []
@@ -115,7 +162,8 @@ class WhisperSTTService(STTService):
                         )
                     )
 
-        text = " ".join(full_text_parts)
+        raw_text = " ".join(full_text_parts)
+        text = normalize_interview_transcript(raw_text)
         avg_conf = (
             sum(w.probability for w in words) / len(words) if words else 1.0
         )

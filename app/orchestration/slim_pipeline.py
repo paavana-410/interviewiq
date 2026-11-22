@@ -62,10 +62,9 @@ def _whisper_installed() -> bool:
 def _get_ui_llm_service():
     """Return the LLMService for the UI judge.
 
-    In mock mode: returns MockLLMService (UI_JUDGE ignored).
-    In real mode: looks up UI_JUDGE by name in the registry.
-    Raises UIJudgeNotConfigured if the setting is missing or the judge
-    is not in the registry.
+    In mock mode: returns MockLLMService.
+    In racing mode: returns RacingLLMService across fast judges.
+    In static mode: looks up UI_JUDGE by name in the registry.
     """
     from app.config import get_settings
     s = get_settings()
@@ -73,6 +72,11 @@ def _get_ui_llm_service():
     if s.llm_provider == "mock":
         from app.services.llm import MockLLMService
         return MockLLMService()
+
+    # Dynamic parallel racing across candidate judges
+    if getattr(s, "ui_judge_router", "static") == "fastest_race" or s.ui_judge == "race":
+        from app.services.llm import get_racing_llm_service
+        return get_racing_llm_service()
 
     if not s.ui_judge:
         raise UIJudgeNotConfigured(
@@ -167,13 +171,17 @@ class SlimResult:
     judge_model: str
     judge_provider: str
     is_mock: bool
+    # Conversational intent
+    is_conversational: bool = False
+    intent: str = "answer"
+    interviewer_reply: str = ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
+def run_slim_pipeline(response_id: int, db: Session, transcript_override: str | None = None) -> SlimResult:
     """Run STT → Delivery → Content for one response. No audit."""
     settings = get_settings()
     is_mock = settings.llm_provider == "mock"
@@ -210,7 +218,22 @@ def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
 
     # 2. STT
     transcript_source: str
-    if is_mock:
+    if transcript_override is not None:
+        from app.services.stt import TranscriptResult, WordTimestamp
+        words_list = transcript_override.strip().split()
+        t_words = [
+            WordTimestamp(word=w, start=i * 0.4, end=i * 0.4 + 0.35, probability=1.0)
+            for i, w in enumerate(words_list)
+        ]
+        stt_result = TranscriptResult(
+            text=transcript_override.strip(),
+            words=t_words,
+            language="en",
+            avg_confidence=1.0,
+            model_name="typed-input",
+        )
+        transcript_source = "typed"
+    elif is_mock:
         # Per-question synthetic transcript — different text per question
         transcript_text = _synthetic_transcript(question_id, question_text)
         transcript_source = "synthetic"
@@ -233,6 +256,123 @@ def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
         )
         stt_result = stt.transcribe(response.audio_path or "")
         transcript_source = "whisper"
+
+    # Conversational intent check (handling pause requests, pass, repeat, mic checks)
+    from app.services.intent import ConversationalIntent, classify_conversational_intent
+    intent_res = classify_conversational_intent(stt_result.text, question_text)
+
+    if intent_res.is_conversational:
+        if intent_res.intent == ConversationalIntent.PASS:
+            # Candidate passed question / said "I don't know" / "I shall pass":
+            # Explicitly evaluate as 0 score for BOTH delivery and content.
+            t = Transcript(
+                response_id=response_id,
+                transcript_text=stt_result.text,
+                word_timestamps=stt_result.to_word_timestamps_json(),
+                stt_model=stt_result.model_name,
+                confidence=stt_result.avg_confidence,
+                source=transcript_source,
+            )
+            db.add(t)
+            db.flush()
+
+            # Zero delivery metrics
+            dm = DeliveryMetrics(
+                response_id=response_id,
+                speaking_rate=0.0,
+                pause_count=0,
+                long_pause_count=0,
+                filler_count=0,
+                filler_density=0.0,
+                repetition_count=0,
+                duration_sec=0,
+                detail_json={"delivery_score": 0.0, "status": "passed_zero_score"},
+            )
+            db.add(dm)
+            db.flush()
+
+            # Zero content evaluation
+            ce = ContentEvaluation(
+                response_id=response_id,
+                correctness_score=0.0,
+                coverage_score=0.0,
+                relevance_score=0.0,
+                completeness_score=0.0,
+                star_score=0.0,
+                overall_score=0.0,
+                evidence_json={
+                    "verdict": "passed_zero_score",
+                    "reason": "Candidate explicitly passed or stated 'I don't know' — scored 0 for content and delivery",
+                    "interviewer_reply": intent_res.interviewer_reply,
+                },
+                used_delivery_features=False,
+            )
+            db.add(ce)
+            db.commit()
+
+            return SlimResult(
+                response_id=response_id,
+                question_text=question_text,
+                transcript=stt_result.text,
+                transcript_source=transcript_source,
+                wpm=0.0,
+                pause_count=0,
+                long_pause_count=0,
+                filler_count=0,
+                filler_density=0.0,
+                repetition_count=0,
+                duration_sec=0.0,
+                overall_score=0.0,
+                correctness_score=0.0,
+                coverage_score=0.0,
+                relevance_score=0.0,
+                completeness_score=0.0,
+                star_score=0.0,
+                evidence_json={
+                    "verdict": "passed_zero_score",
+                    "reason": "Candidate explicitly passed — evaluated as 0 score for delivery and content",
+                    "interviewer_reply": intent_res.interviewer_reply,
+                },
+                uncertainty=False,
+                judge_model="conversational_handler",
+                judge_provider="local",
+                is_mock=is_mock,
+                is_conversational=True,
+                intent=intent_res.intent.value,
+                interviewer_reply=intent_res.interviewer_reply,
+            )
+        else:
+            # NEED_MOMENT, REPEAT, MIC_CHECK, GREETING:
+            # Not an answer — do NOT evaluate and do NOT keep as an answered response!
+            db.delete(response)
+            db.commit()
+            return SlimResult(
+                response_id=0,
+                question_text=question_text,
+                transcript=stt_result.text,
+                transcript_source=transcript_source,
+                wpm=0.0,
+                pause_count=0,
+                long_pause_count=0,
+                filler_count=0,
+                filler_density=0.0,
+                repetition_count=0,
+                duration_sec=float(getattr(stt_result, "duration_sec", 0.0) or 0.0),
+                overall_score=0.0,
+                correctness_score=None,
+                coverage_score=None,
+                relevance_score=None,
+                completeness_score=None,
+                star_score=None,
+                evidence_json={"interviewer_reply": intent_res.interviewer_reply},
+                uncertainty=False,
+                judge_model="conversational_handler",
+                judge_provider="local",
+                is_mock=is_mock,
+                is_conversational=True,
+                intent=intent_res.intent.value,
+                interviewer_reply=intent_res.interviewer_reply,
+            )
 
     # Persist transcript
     t = Transcript(
@@ -272,6 +412,15 @@ def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
         rubric_criteria=rubric_criteria,
     )
 
+    # 5. Acoustic Proctoring (Multi-speaker & Pause Whisper Detection)
+    from app.services.acoustic_proctor import analyze_acoustic_integrity
+    proctor_res = analyze_acoustic_integrity(
+        audio_path=response.audio_path,
+        word_timestamps=stt_result.to_word_timestamps_json(),
+    )
+    evidence_payload = dict(cr.evidence_json)
+    evidence_payload["proctoring"] = proctor_res.to_dict()
+
     ce = ContentEvaluation(
         response_id=response_id,
         correctness_score=cr.correctness_score,
@@ -280,7 +429,7 @@ def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
         completeness_score=cr.completeness_score,
         star_score=cr.star_score,
         overall_score=cr.overall_score,
-        evidence_json=cr.evidence_json,
+        evidence_json=evidence_payload,
         used_delivery_features=cr.used_delivery_features,
         llm_call_log_id=cr.llm_call_log_id,
     )
@@ -305,7 +454,7 @@ def run_slim_pipeline(response_id: int, db: Session) -> SlimResult:
         relevance_score=cr.relevance_score,
         completeness_score=cr.completeness_score,
         star_score=cr.star_score,
-        evidence_json=cr.evidence_json,
+        evidence_json=evidence_payload,
         uncertainty=cr.uncertainty,
         judge_model=llm.model_name,
         judge_provider=llm.provider,

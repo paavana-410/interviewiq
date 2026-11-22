@@ -64,3 +64,6 @@ Thumbs.db
 
 # Temporary extracted images from PDF
 page_*.png
+*.db
+*.db-shm
+*.db-wal

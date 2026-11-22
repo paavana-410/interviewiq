@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -115,8 +115,8 @@ class CallStats:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CriterionResult(BaseModel):
-    criterion_name: str
-    score: float = Field(ge=0.0, le=1.0)
+    criterion_name: str = "general"
+    score: float = Field(default=0.0, ge=0.0, le=1.0)
     # v2: at most 3 items each
     covered_concepts: list[str] = Field(default_factory=list)
     missing_concepts: list[str] = Field(default_factory=list)
@@ -127,7 +127,12 @@ class CriterionResult(BaseModel):
     @field_validator("score", mode="before")
     @classmethod
     def clamp_score(cls, v: Any) -> float:
-        return max(0.0, min(1.0, float(v)))
+        if v is None:
+            return 0.0
+        try:
+            return max(0.0, min(1.0, float(v)))
+        except (ValueError, TypeError):
+            return 0.0
 
     @field_validator("covered_concepts", "missing_concepts", mode="before")
     @classmethod
@@ -153,16 +158,54 @@ class STARDetection(BaseModel):
 
 
 class ContentEvalOutput(BaseModel):
-    criteria: list[CriterionResult]
-    overall_score: float = Field(ge=0.0, le=1.0)
+    criteria: list[CriterionResult] = Field(default_factory=list)
+    overall_score: float = Field(default=0.0, ge=0.0, le=1.0)
     star_detected: STARDetection = Field(default_factory=STARDetection)
     uncertainty: bool = False
     uncertainty_reason: str | None = None
 
+    @field_validator("star_detected", mode="before")
+    @classmethod
+    def coerce_star_detected(cls, v: Any) -> Any:
+        """LLMs sometimes return `false` or `null` instead of the dict."""
+        if isinstance(v, dict):
+            return v
+        # Any non-dict (bool, None, str) → default empty STARDetection
+        return {"situation": False, "task": False, "action": False, "result": False}
+
+    @model_validator(mode="before")
+    @classmethod
+    def compute_default_overall(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "overall_score" not in data or data["overall_score"] is None:
+                criteria = data.get("criteria", [])
+                if isinstance(criteria, list) and criteria:
+                    scores = []
+                    for c in criteria:
+                        if isinstance(c, dict) and "score" in c and c["score"] is not None:
+                            try:
+                                scores.append(float(c["score"]))
+                            except (ValueError, TypeError):
+                                pass
+                    data["overall_score"] = (sum(scores) / len(scores)) if scores else 0.0
+                else:
+                    data["overall_score"] = 0.0
+            else:
+                try:
+                    data["overall_score"] = max(0.0, min(1.0, float(data["overall_score"])))
+                except (ValueError, TypeError):
+                    data["overall_score"] = 0.0
+        return data
+
     @field_validator("overall_score", mode="before")
     @classmethod
     def clamp_overall(cls, v: Any) -> float:
-        return max(0.0, min(1.0, float(v)))
+        if v is None:
+            return 0.0
+        try:
+            return max(0.0, min(1.0, float(v)))
+        except (ValueError, TypeError):
+            return 0.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -269,7 +312,7 @@ def _build_prompt(
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Default starting max_tokens for content eval calls
-_DEFAULT_MAX_TOKENS = 2048
+_DEFAULT_MAX_TOKENS = 4096
 # Maximum we'll ever double up to before giving up
 _MAX_TOKENS_CEILING = 8192
 
@@ -338,6 +381,7 @@ class ContentEngine:
                 result = self._call_with_parse_retry(
                     prompt, prompt_version=prompt_version,
                     max_tokens=max_tokens, run_index=run_index,
+                    bypass_cache=(attempt > 0),
                 )
                 return result
             except TruncatedOutputError as exc:
@@ -365,6 +409,7 @@ class ContentEngine:
         prompt_version: str,
         max_tokens: int,
         run_index: int | None = None,
+        bypass_cache: bool = False,
     ) -> tuple[LLMResponse, ContentEvalOutput, int | None]:
         """Call LLM and parse JSON. Retries up to 3x on parse failures.
 
@@ -376,19 +421,22 @@ class ContentEngine:
             max_tokens=max_tokens,
             prompt_version=prompt_version,
             run_index=run_index,
+            bypass_cache=bypass_cache,
         )
         raw = llm_resp.text
 
-        # Check for truncation BEFORE trying to parse
-        if llm_resp.finish_reason == "length":
-            raise TruncatedOutputError(
-                tokens_used=llm_resp.output_tokens or max_tokens,
-                max_tokens=max_tokens,
-            )
-
-        json_str = self._extract_json(raw)
-        parsed_data = json.loads(json_str)
-        validated = ContentEvalOutput.model_validate(parsed_data)
+        try:
+            json_str = self._extract_json(raw)
+            parsed_data = json.loads(json_str)
+            validated = ContentEvalOutput.model_validate(parsed_data)
+        except Exception:
+            # Only treat as fatal truncation if we cannot extract valid JSON
+            if llm_resp.finish_reason == "length":
+                raise TruncatedOutputError(
+                    tokens_used=llm_resp.output_tokens or max_tokens,
+                    max_tokens=max_tokens,
+                )
+            raise
 
         log_id = self._persist_call(
             prompt=prompt,

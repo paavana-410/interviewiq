@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     # in .env). If unset or the judge is not found, the app refuses to start
     # in real mode. In mock mode this setting is ignored.
     ui_judge: str = ""
+    # "static" (single judge) or "fastest_race" (parallel race among configured judges)
+    ui_judge_router: str = "static"
 
     # ── Delivery Engine thresholds ────────────────────────────────────────────
     long_pause_threshold_sec: float = 1.5

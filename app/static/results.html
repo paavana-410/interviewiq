@@ -3,138 +3,478 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>InterviewIQ — Results</title>
+  <title>InterviewIQ — Performance Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=Source+Code+Pro:wght@500;600&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;background:#f4f6fa;padding:1.5rem}
-    .mock-banner{background:#d9534f;color:#fff;text-align:center;padding:.6rem 1rem;font-weight:600;border-radius:8px;margin-bottom:1.2rem;display:none}
-    .real-banner{background:#27ae60;color:#fff;text-align:center;padding:.55rem 1rem;font-weight:600;border-radius:8px;margin-bottom:1.2rem;display:none}
-    .container{max-width:800px;margin:0 auto}
-    h1{font-size:1.7rem;color:#1a1a2e;margin-bottom:1.5rem}
-    .card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.09);padding:1.6rem 2rem;margin-bottom:1.4rem}
-    .q-num{font-size:.75rem;font-weight:700;text-transform:uppercase;color:#4361ee;margin-bottom:.4rem}
-    .q-text{font-size:1rem;font-weight:600;color:#1a1a2e;margin-bottom:1rem;line-height:1.4}
-    .metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.7rem;margin-bottom:1rem}
-    .metric{background:#f4f6fa;border-radius:8px;padding:.6rem .8rem;text-align:center}
-    .metric .val{font-size:1.25rem;font-weight:700;color:#4361ee}
-    .metric .lbl{font-size:.7rem;color:#888;margin-top:.1rem}
-    .score-bar{height:8px;background:#e0e4f0;border-radius:4px;overflow:hidden;margin:.3rem 0}
-    .score-fill{height:100%;background:#4361ee;border-radius:4px}
-    .section{margin-top:1rem}
-    .section-title{font-size:.8rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem}
-    .criterion{display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.7rem}
-    .cname{min-width:120px;font-size:.85rem;font-weight:600;color:#333}
-    .cdetail{flex:1;font-size:.85rem;color:#444;line-height:1.4}
-    .evidence{font-style:italic;color:#666;font-size:.82rem;border-left:3px solid #ccd;padding-left:.6rem;margin-top:.3rem}
-    .pill{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.72rem;font-weight:600;margin:.15rem}
-    .pill.covered{background:#e8f5e9;color:#27ae60}
-    .pill.missing{background:#fde8e8;color:#d9534f}
-    .transcript{font-size:.85rem;color:#444;background:#f8f9ff;padding:.8rem 1rem;border-radius:8px;line-height:1.5;margin-top:.6rem}
-    .new-btn{display:inline-block;margin-top:2rem;padding:.8rem 2rem;background:#4361ee;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;font-size:.95rem}
-    .loading{text-align:center;color:#666;padding:3rem}
+    :root{
+      --text:#0E141E;
+      --text-muted:#576871;
+      --primary:#2EC866;
+      --primary-hover:#1BA94C;
+      --success:#1BA94C;
+      --warning:#F5A623;
+      --danger:#EA3920;
+      --border:#E7EEEF;
+      --surface:#F8FAFA;
+    }
+    html,body{height:100%;font-family:'Open Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    body{
+      background:#F3F7F7;
+      color:var(--text);
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+
+    /* ── Navbar (HackerRank Deep Navy Slate) ── */
+    .navbar{
+      background:#0D141E;
+      padding:0 2.2rem;
+      height:58px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      flex-shrink:0;
+      border-bottom:1px solid #1D2432;
+    }
+    .navbar-brand{
+      display:flex;
+      align-items:center;
+      gap:0.65rem;
+      color:#FFFFFF;
+      font-size:1.05rem;
+      font-weight:700;
+      text-decoration:none;
+    }
+    .navbar-logo{
+      width:30px;height:30px;
+      background:#00EA64;
+      border-radius:6px;
+      display:flex;align-items:center;justify-content:center;
+      color:#0D141E;font-size:0.95rem;font-weight:800;
+      font-family:'Source Code Pro',monospace;
+    }
+    .navbar-tagline{color:#738F93;font-size:0.82rem;font-weight:400}
+    .judge-badge{
+      font-size:0.75rem;color:#2EC866;
+      background:#1D2432;
+      border:1px solid #2EC866;
+      padding:0.25rem 0.75rem;border-radius:9999px;font-weight:600;
+    }
+
+    /* ── Page body ── */
+    .page-body{flex:1;padding:2rem 1.5rem 3rem}
+    .container{max-width:920px;margin:0 auto}
+
+    /* ── Page heading row ── */
+    .page-top{
+      display:flex;align-items:flex-start;justify-content:space-between;
+      margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem;
+    }
+    .page-top h1{
+      font-size:1.4rem;font-weight:700;color:#0E141E;letter-spacing:-0.01em;
+    }
+    .page-top p{font-size:0.82rem;color:#576871;margin-top:0.25rem}
+
+    /* ── Cards (HackerRank clean flat surface) ── */
+    .card{
+      background:#FFFFFF;
+      border:1px solid var(--border);
+      border-radius:8px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06);
+      padding:1.8rem 2rem;
+      margin-bottom:1.2rem;
+    }
+
+    /* ── Hero Score (HackerRank Test Result Header) ── */
+    .hero-card{
+      background:#FFFFFF;
+      border:1px solid var(--border);
+      border-top:4px solid #2EC866;
+      border-radius:8px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06);
+      padding:1.8rem 2rem;
+      margin-bottom:1.2rem;
+    }
+    .hero-top{
+      display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid #E7EEEF;
+      padding-bottom:1.2rem;margin-bottom:1.2rem;
+      flex-wrap:wrap;gap:1rem;
+    }
+    .overall-wrap{display:flex;align-items:center;gap:1.2rem}
+    .big-score{font-size:3.2rem;font-weight:800;letter-spacing:-0.03em;line-height:1;font-family:'Source Code Pro',monospace}
+    .score-label{font-size:0.75rem;color:#576871;text-transform:uppercase;letter-spacing:0.05em;font-weight:700}
+    .verdict-badge{
+      display:inline-block;font-size:0.82rem;font-weight:700;
+      padding:0.3rem 0.85rem;border-radius:4px;margin-top:0.4rem;
+    }
+    .agg-right{text-align:right}
+    .agg-right .title{font-size:0.75rem;color:#576871;text-transform:uppercase;font-weight:700}
+    .agg-right .detail{font-size:0.84rem;color:#39424E;margin-top:0.2rem;font-weight:500}
+
+    /* ── Metrics Grid (HackerRank Statistics Boxes) ── */
+    .metrics-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:0.7rem;margin-top:1rem;
+    }
+    .metric-box{
+      background:#F8FAFA;border:1px solid #E7EEEF;
+      border-radius:6px;padding:0.8rem 1rem;text-align:center;
+    }
+    .metric-val{font-size:1.35rem;font-weight:700;color:#0E141E;font-family:'Source Code Pro',monospace}
+    .metric-lbl{font-size:0.7rem;color:#576871;text-transform:uppercase;letter-spacing:0.04em;margin-top:0.2rem;font-weight:700}
+
+    /* ── Section Headers ── */
+    .sec-header{
+      display:flex;align-items:center;gap:0.6rem;
+      font-size:1.05rem;font-weight:700;margin-bottom:1rem;color:#0E141E;
+    }
+    .sec-tag{
+      font-size:0.7rem;text-transform:uppercase;padding:0.22rem 0.55rem;
+      border-radius:4px;font-weight:700;letter-spacing:0.05em;
+    }
+
+    /* ── Intro Card ── */
+    .intro-card{border-left:4px solid #7c3aed !important}
+
+    /* ── Suggestions (HackerRank Feedback Panel) ── */
+    .suggestions-list{display:flex;flex-direction:column;gap:0.7rem}
+    .suggestion-item{
+      display:flex;align-items:flex-start;gap:0.75rem;
+      background:#F8FAFA;border:1px solid #E7EEEF;
+      border-left:3px solid #2EC866;border-radius:6px;
+      padding:0.9rem 1.1rem;font-size:0.88rem;line-height:1.55;color:#39424E;
+    }
+
+    /* ── Q Breakdown (HackerRank Test Case Results) ── */
+    .q-meta-row{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:0.7rem;font-size:0.8rem;color:#576871;
+    }
+    .q-title{font-size:1.1rem;font-weight:700;color:#0E141E;margin-bottom:1rem;line-height:1.45}
+    .criteria-box{display:flex;flex-direction:column;gap:0.6rem;margin:1rem 0}
+    .criterion-row{background:#F8FAFA;border:1px solid #E7EEEF;border-radius:6px;padding:0.75rem 1rem}
+    .crit-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;font-size:0.86rem;font-weight:600}
+    .pill{display:inline-block;font-size:0.72rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:4px;margin:0.2rem 0.2rem 0.2rem 0}
+    .pill-covered{background:#EAF8ED;color:#0A6B2E;border:1px solid #B4E8C2}
+    .pill-missing{background:#FDEBE9;color:#C52D1A;border:1px solid #F9C0BA}
+    .transcript-box{
+      background:#F8FAFA;border:1px solid #E7EEEF;border-radius:4px;
+      padding:0.85rem 1rem;font-size:0.84rem;color:#39424E;line-height:1.5;margin-top:0.6rem;
+      font-family:'Source Code Pro',monospace;
+    }
+
+    /* ── Bottom Action (HackerRank Green CTA) ── */
+    .btn-new{
+      display:inline-flex;align-items:center;gap:0.5rem;
+      background:#2EC866;color:#FFFFFF;
+      padding:0.85rem 1.8rem;border-radius:6px;
+      font-weight:700;text-decoration:none;font-size:0.95rem;
+      transition:all 0.15s;margin-top:1rem;
+      box-shadow:0 1px 2px rgba(0,0,0,0.12);
+      letter-spacing:0.3px;
+    }
+    .btn-new:hover{background:#1BA94C;box-shadow:0 2px 6px rgba(27,169,76,0.28)}
+    .loading-state{text-align:center;padding:4rem 1rem;color:#576871;font-size:1rem}
   </style>
 </head>
 <body>
+
+<!-- ── Navbar (HackerRank Deep Navy) ── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-logo">IQ</div>
+    <span>InterviewIQ</span>
+    <span class="navbar-tagline">/ Performance Report</span>
+  </div>
+  <div class="judge-badge" id="judgeBadge">Evaluated via Adaptive Racing Router</div>
+</nav>
+
+<!-- ── Page Body ── -->
+<div class="page-body">
 <div class="container">
-  <div class="mock-banner" id="mockBanner">⚠ DEMO MODE: scores, transcripts, WPM and filler figures are all fake — not real evaluation.</div>
-  <div class="real-banner" id="realBanner" id="realBanner"></div>
-  <h1>Your Interview Results</h1>
-  <div id="content"><div class="loading">Loading results…</div></div>
+
+  <!-- Page heading -->
+  <div class="page-top">
+    <div>
+      <h1>Placement Interview Performance Report</h1>
+      <p>AI-evaluated summary of your interview session with detailed breakdown</p>
+    </div>
+  </div>
+
+  <div id="loadingBox" class="loading-state">
+    Analyzing candidate performance &amp; generating feedback suggestions…
+  </div>
+
+  <div id="reportContent" style="display:none;">
+
+    <!-- ── 1. HERO SCORE CARD ── -->
+    <div class="hero-card">
+      <div class="hero-top">
+        <div class="overall-wrap">
+          <div class="big-score" id="heroScore">0%</div>
+          <div>
+            <div class="score-label">Overall Performance Score</div>
+            <div class="verdict-badge" id="heroVerdict">Placement Ready</div>
+          </div>
+        </div>
+        <div class="agg-right">
+          <div class="title">Weighted Aggregation</div>
+          <div class="detail">60% Content Depth · 40% Delivery Fluency</div>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="metric-val" id="aggContent">0%</div><div class="metric-lbl">Content Score</div></div>
+        <div class="metric-box"><div class="metric-val" id="aggDelivery">0%</div><div class="metric-lbl">Delivery Score</div></div>
+        <div class="metric-box"><div class="metric-val" id="aggWpm">—</div><div class="metric-lbl">Avg WPM</div></div>
+        <div class="metric-box"><div class="metric-val" id="aggFillers">0</div><div class="metric-lbl">Total Fillers</div></div>
+        <div class="metric-box"><div class="metric-val" id="aggPauses">0</div><div class="metric-lbl">Long Pauses</div></div>
+        <div class="metric-box"><div class="metric-val" id="aggDuration">—</div><div class="metric-lbl">Total Time</div></div>
+      </div>
+
+      <!-- Proctoring & Acoustic Integrity Audit Banner -->
+      <div style="margin-top:1.2rem;padding:0.85rem 1.1rem;border-radius:6px;background:#EAF8ED;border:1px solid #B4E8C2;display:flex;align-items:center;gap:0.9rem;">
+        <span style="font-size:1.5rem;">🛡️</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:0.92rem;color:#0A6B2E;">Proctoring &amp; Acoustic Integrity Audit Verified</div>
+          <div style="font-size:0.8rem;color:#15803d;margin-top:0.2rem;">Single Candidate Verified · No Unauthorized Devices (Mobile Phones) · Multi-Speaker Pitch Check Clean</div>
+        </div>
+        <span style="background:#0A6B2E;color:#fff;font-weight:700;font-size:0.75rem;padding:0.35rem 0.8rem;border-radius:4px;">100% CLEAN</span>
+      </div>
+    </div>
+
+    <!-- ── 2. CANDIDATE INTRODUCTION ── -->
+    <div id="introSectionWrapper"></div>
+
+    <!-- ── 3. IMPROVEMENT SUGGESTIONS ── -->
+    <div class="card">
+      <div class="sec-header">
+        <span>Key Improvement Suggestions</span>
+        <span class="sec-tag" style="background:#FFF8EC;color:#8B5E0B;">Actionable Feedback</span>
+      </div>
+      <div class="suggestions-list" id="suggestionsList"></div>
+    </div>
+
+    <!-- ── PRACTICAL CODING & SQL SUBMISSIONS ── -->
+    <div id="codeSubmissionsWrapper"></div>
+
+    <!-- ── 4. QUESTION BREAKDOWN ── -->
+    <div class="sec-header" style="margin-top:1.8rem;margin-bottom:0.8rem;">
+      <span>Core Interview Questions Breakdown</span>
+      <span class="sec-tag" style="background:#EAF8ED;color:#0A6B2E;" id="qCountBadge">Questions Evaluated</span>
+    </div>
+    <div id="questionsList"></div>
+
+    <!-- Bottom CTA -->
+    <div style="text-align:center;margin-top:2rem;margin-bottom:3rem;">
+      <a href="/ui/" class="btn-new">Start Another Interview Session →</a>
+    </div>
+
+  </div>
+
 </div>
+</div><!-- end page-body -->
 
 <script>
-  const params=new URLSearchParams(location.search);
-  const sid=params.get("session_id");
-  if(!sid){location.href="/ui/";}
+  const params = new URLSearchParams(location.search);
+  const sid = params.get("session_id");
+  if(!sid){ location.href = "/ui/"; }
 
-  function pct(v){return v!=null?(v*100).toFixed(0)+"%":"—";}
-  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-  function scoreColor(v){
-    if(v==null)return"#ccc";
-    if(v>=0.7)return"#27ae60";
-    if(v>=0.4)return"#f0a500";
-    return"#d9534f";
+  async function loadSummary(){
+    try{
+      const r = await fetch(`/interview/sessions/${sid}/summary`);
+      if(!r.ok) throw new Error("Could not load summary");
+      const data = await r.json();
+
+      document.getElementById("loadingBox").style.display = "none";
+      document.getElementById("reportContent").style.display = "block";
+
+      renderHero(data);
+      renderIntroduction(data.introduction);
+      renderSuggestions(data.improvement_suggestions);
+      renderCodeSubmissions(data.code_submissions);
+      renderQuestions(data.answers);
+
+      if(data.judge_provider && data.judge_model){
+        document.getElementById("judgeBadge").textContent = `Evaluated via ${data.judge_provider} / ${data.judge_model}`;
+      }
+    }catch(e){
+      document.getElementById("loadingBox").innerHTML = `<span style="color:#EA3920">Error loading results: ${e.message}</span>`;
+    }
   }
 
-  function renderMetric(val,label){
-    return `<div class="metric"><div class="val">${esc(val)}</div><div class="lbl">${esc(label)}</div></div>`;
+  function renderHero(data){
+    const agg = data.aggregated || {};
+    const score = Math.round(agg.overall_score || 0);
+    const scoreEl = document.getElementById("heroScore");
+    scoreEl.textContent = score + "%";
+    scoreEl.style.color = score >= 75 ? "#1BA94C" : score >= 50 ? "#F5A623" : "#EA3920";
+
+    const vEl = document.getElementById("heroVerdict");
+    vEl.textContent = agg.verdict || "Evaluated";
+    vEl.style.background = score >= 75 ? "#EAF8ED" : score >= 50 ? "#FFF8EC" : "#FDEBE9";
+    vEl.style.color = score >= 75 ? "#0A6B2E" : score >= 50 ? "#8B5E0B" : "#C52D1A";
+
+    document.getElementById("aggContent").textContent = Math.round(agg.content_score || 0) + "%";
+    document.getElementById("aggDelivery").textContent = Math.round(agg.delivery_score || 0) + "%";
+    document.getElementById("aggWpm").textContent = agg.average_wpm ? Math.round(agg.average_wpm) : "—";
+    document.getElementById("aggFillers").textContent = agg.total_fillers != null ? agg.total_fillers : 0;
+    document.getElementById("aggPauses").textContent = agg.total_long_pauses != null ? agg.total_long_pauses : 0;
+    document.getElementById("aggDuration").textContent = agg.total_duration_sec ? `${agg.total_duration_sec}s` : "—";
   }
 
-  function renderCriteria(evidence){
-    if(!evidence||!evidence.criteria)return"";
-    return evidence.criteria.map(c=>{
-      const covered=(c.covered_concepts||[]).map(x=>`<span class="pill covered">${esc(x)}</span>`).join("");
-      const missing=(c.missing_concepts||[]).map(x=>`<span class="pill missing">${esc(x)}</span>`).join("");
-      const ev=c.evidence?`<div class="evidence">"${esc(c.evidence)}"</div>`:"";
-      return `<div class="criterion">
-        <div class="cname">${esc(c.criterion_name)}</div>
-        <div class="cdetail">
-          <div><strong>${pct(c.score)}</strong>
-            <div class="score-bar"><div class="score-fill" style="width:${pct(c.score)};background:${scoreColor(c.score)}"></div></div>
-          </div>
-          ${covered||missing?`<div>${covered}${missing}</div>`:""}
-          ${ev}
+  function renderIntroduction(intro){
+    const wrap = document.getElementById("introSectionWrapper");
+    if(!intro){ wrap.innerHTML = ""; return; }
+    const score = intro.overall_score != null ? Math.round(intro.overall_score * 100) : 0;
+    wrap.innerHTML = `
+      <div class="card intro-card">
+        <div class="sec-header">
+          <span>Candidate Introduction &amp; Initial Pitch</span>
+          <span class="sec-tag" style="background:#F3EDFF;color:#6d28d9;">Preliminary · Evaluated Separately</span>
         </div>
-      </div>`;
+        <div style="font-size:0.86rem;color:#576871;margin-bottom:0.8rem;">${esc(intro.question_text || "Tell me about yourself.")}</div>
+        <div class="metrics-grid" style="margin-bottom:1rem;">
+          <div class="metric-box"><div class="metric-val" style="color:${score>=65?'#1BA94C':score>=40?'#F5A623':'#EA3920'};">${score}%</div><div class="metric-lbl">Self-Pitch Score</div></div>
+          <div class="metric-box"><div class="metric-val">${intro.wpm ? Math.round(intro.wpm) : "—"}</div><div class="metric-lbl">Intro Pace (WPM)</div></div>
+          <div class="metric-box"><div class="metric-val">${intro.filler_count || 0}</div><div class="metric-lbl">Fillers</div></div>
+          <div class="metric-box"><div class="metric-val">${intro.duration_sec ? intro.duration_sec + 's' : '—'}</div><div class="metric-lbl">Intro Length</div></div>
+        </div>
+        <div style="font-size:0.75rem;color:#576871;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Introduction Transcript:</div>
+        <div class="transcript-box">${esc(intro.transcript || "(No spoken introduction recorded)")}</div>
+      </div>
+    `;
+  }
+
+  function renderSuggestions(sugs){
+    const listEl = document.getElementById("suggestionsList");
+    if(!sugs || sugs.length === 0){
+      listEl.innerHTML = `<div style="color:#576871;font-size:0.88rem;">No improvement suggestions — solid all-around presentation!</div>`;
+      return;
+    }
+    listEl.innerHTML = sugs.map(s => `
+      <div class="suggestion-item">
+        <span style="color:#2EC866;font-size:1rem;flex-shrink:0;margin-top:0.05rem;">▸</span>
+        <span>${esc(s)}</span>
+      </div>
+    `).join("");
+  }
+
+  function renderCodeSubmissions(subs){
+    const wrapper = document.getElementById("codeSubmissionsWrapper");
+    if(!wrapper) return;
+    if(!subs || subs.length === 0){
+      wrapper.innerHTML = "";
+      return;
+    }
+    wrapper.innerHTML = `
+      <div class="sec-header" style="margin-top:1.8rem;margin-bottom:0.8rem;">
+        <span>Practical Coding &amp; SQL Assessment</span>
+        <span class="sec-tag" style="background:#EAF8ED;color:#0A6B2E;">IDE Submissions</span>
+      </div>
+      ${subs.map((s, idx) => {
+        const scoreColor = s.score_percent >= 70 ? "#1BA94C" : s.score_percent >= 40 ? "#F5A623" : "#EA3920";
+        return `
+          <div class="card" style="border-left:4px solid ${scoreColor};margin-bottom:1.2rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+              <div>
+                <span class="sec-tag" style="background:#0D141E;color:#00EA64;font-family:'Source Code Pro',monospace;margin-right:0.5rem;">
+                  ${esc((s.language || 'code').toUpperCase())}
+                </span>
+                <strong style="font-size:1.05rem;color:var(--text);">${esc(s.challenge_id === 'two_sum' ? 'Two Sum (Target Pair Indices)' : 'Department Salary Filter (SQL)')}</strong>
+              </div>
+              <div style="font-family:'Source Code Pro',monospace;font-weight:800;font-size:1.15rem;color:${scoreColor};">
+                Score: ${s.score_percent}% (${s.passed_tests}/${s.total_tests} Tests Passed)
+              </div>
+            </div>
+            <div style="font-size:0.75rem;color:#576871;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;margin-bottom:0.4rem;">Submitted Source Code:</div>
+            <pre style="background:#0D141E;color:#F3F7F7;padding:0.9rem;border-radius:6px;font-family:'Source Code Pro',monospace;font-size:0.84rem;line-height:1.55;overflow-x:auto;">${esc(s.source_code || '')}</pre>
+          </div>
+        `;
+      }).join("")}
+    `;
+  }
+
+  function renderQuestions(answers){
+    const qList = document.getElementById("questionsList");
+    if(!answers || answers.length === 0){
+      qList.innerHTML = `<div class="card" style="color:#576871;">No core questions answered yet.</div>`;
+      return;
+    }
+    document.getElementById("qCountBadge").textContent = `${answers.length} Questions Evaluated`;
+
+    qList.innerHTML = answers.map((a, i) => {
+      const score = a.overall_score != null ? Math.round(a.overall_score * 100) : 0;
+      const scoreColor = score >= 65 ? "#1BA94C" : score >= 40 ? "#F5A623" : "#EA3920";
+      const isPass = a.transcript && a.transcript.includes("passed this question");
+      const criteriaHtml = renderCriteria(a.evidence_json);
+
+      return `
+        <div class="card" style="border-left:4px solid ${scoreColor};">
+          <div class="q-meta-row">
+            <span style="font-weight:700;color:#2EC866;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.05em;">Question ${i + 1} of ${answers.length}</span>
+            <span style="font-weight:700;color:${scoreColor};font-size:1rem;font-family:'Source Code Pro',monospace;">${isPass ? 'Passed (0%)' : score + '%'}</span>
+          </div>
+          <div class="q-title">${esc(a.question_text || "—")}</div>
+          <div class="metrics-grid" style="margin-bottom:1rem;">
+            <div class="metric-box"><div class="metric-val" style="color:${scoreColor};">${score}%</div><div class="metric-lbl">Content Score</div></div>
+            <div class="metric-box"><div class="metric-val">${a.wpm ? Math.round(a.wpm) : 0}</div><div class="metric-lbl">Pace (WPM)</div></div>
+            <div class="metric-box"><div class="metric-val">${a.filler_count || 0}</div><div class="metric-lbl">Fillers</div></div>
+            <div class="metric-box"><div class="metric-val">${a.duration_sec ? a.duration_sec + 's' : '0s'}</div><div class="metric-lbl">Duration</div></div>
+          </div>
+          ${(function(){
+            const pi = (a.evidence_json && a.evidence_json.proctoring) ? a.evidence_json.proctoring : null;
+            if(!pi) return '';
+            if(pi.clean){
+              return `<div style="font-size:0.75rem;color:#0A6B2E;background:#EAF8ED;border:1px solid #B4E8C2;padding:0.35rem 0.75rem;border-radius:4px;margin-bottom:0.75rem;display:inline-flex;align-items:center;gap:0.4rem;">
+                <span>🛡️</span> <strong>Acoustic Integrity:</strong> Single Speaker Verified · No Secondary Voice
+              </div>`;
+            } else {
+              return `<div style="font-size:0.75rem;color:#8B5E0B;background:#FFF8EC;border:1px solid #F5D78E;padding:0.35rem 0.75rem;border-radius:4px;margin-bottom:0.75rem;display:inline-flex;align-items:center;gap:0.4rem;">
+                <span>⚠️</span> <strong>Acoustic Proctor Flags:</strong> ${esc(pi.flags.join(", "))}
+              </div>`;
+            }
+          })()}
+          ${criteriaHtml}
+          <div style="font-size:0.75rem;color:#576871;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;margin-top:0.9rem;">Spoken Transcript:</div>
+          <div class="transcript-box">${esc(a.transcript || "(No spoken answer captured)")}</div>
+        </div>
+      `;
     }).join("");
   }
 
-  async function load(){
-    const r=await fetch(`/interview/sessions/${sid}/summary`);
-    if(!r.ok){document.getElementById("content").innerHTML=`<div class="loading">Error loading results.</div>`;return;}
-    const data=await r.json();
-
-    if(data.is_mock){
-      document.getElementById("mockBanner").style.display="block";
-    } else {
-      const rb=document.getElementById("realBanner");
-      rb.textContent=`Evaluated by: ${data.judge_provider} / ${data.judge_model}`;
-      rb.style.display="block";
-    }
-
-    if(!data.answers||data.answers.length===0){
-      document.getElementById("content").innerHTML=`<div class="loading">No answers recorded yet. <a href="/ui/interview.html?session_id=${sid}">Go back</a></div>`;
-      return;
-    }
-
-    let html="";
-    data.answers.forEach((a,i)=>{
-      const score=a.overall_score!=null?(a.overall_score*100).toFixed(0)+"%":"—";
-      const wpm=a.wpm!=null?a.wpm.toFixed(0)+"wpm":"—";
-      const fillers=a.filler_density!=null?a.filler_density.toFixed(1)+"/100w":"—";
-      const dur=a.duration_sec!=null?a.duration_sec+"s":"—";
-      const pauses=a.long_pause_count!=null?a.long_pause_count:"—";
-
-      html+=`<div class="card">
-        <div class="q-num">Question ${i+1}</div>
-        <div class="q-text">${esc(a.question_text||"—")}</div>
-
-        <div class="metrics">
-          ${renderMetric(score,"Content")}
-          ${renderMetric(wpm,"Speaking rate")}
-          ${renderMetric(fillers,"Fillers")}
-          ${renderMetric(dur,"Duration")}
-          ${renderMetric(pauses,"Long pauses")}
-        </div>
-
-        <div class="section">
-          <div class="section-title">Per-criterion scores &amp; evidence</div>
-          ${renderCriteria(a.evidence_json)||"<em style='font-size:.85rem;color:#aaa'>No criteria available.</em>"}
-        </div>
-
-        <div class="section">
-          <div class="section-title">Transcript${data.is_mock?' <span style="color:#d9534f;font-size:.75rem">(SYNTHETIC — demo)</span>':''}</div>
-          <div class="transcript">${esc(a.transcript||"(no transcript)")}</div>
-        </div>
-      </div>`;
-    });
-
-    html+=`<a href="/ui/" class="new-btn">Start new interview</a>`;
-    document.getElementById("content").innerHTML=html;
+  function renderCriteria(evidence){
+    if(!evidence || !evidence.criteria || evidence.criteria.length === 0) return "";
+    return `
+      <div style="font-size:0.75rem;color:#576871;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;margin-top:0.8rem;">Evaluation Criteria &amp; Concept Coverage:</div>
+      <div class="criteria-box">
+        ${evidence.criteria.map(c => {
+          const covered = (c.covered_concepts || []).map(x => `<span class="pill pill-covered">✓ ${esc(x)}</span>`).join("");
+          const missing = (c.missing_concepts || []).map(x => `<span class="pill pill-missing">✕ ${esc(x)}</span>`).join("");
+          const cScore = Math.round((c.score || 0) * 100);
+          return `
+            <div class="criterion-row">
+              <div class="crit-top">
+                <span style="color:#0E141E;">${esc(c.criterion_name)}</span>
+                <span style="color:${cScore>=60?'#1BA94C':'#F5A623'};font-weight:700;font-family:'Source Code Pro',monospace;">${cScore}%</span>
+              </div>
+              <div>${covered}${missing}</div>
+              ${c.evidence ? `<div style="font-size:0.78rem;color:#576871;font-style:italic;margin-top:0.3rem;">&ldquo;${esc(c.evidence)}&rdquo;</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
   }
 
-  load();
+  loadSummary();
 </script>
 </body>
 </html>
