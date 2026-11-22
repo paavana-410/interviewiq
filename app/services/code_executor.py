@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -91,10 +92,27 @@ CHALLENGES = {
                 "    }\n"
                 "    return [];\n"
                 "}\n"
+            ),
+            "java": (
+                "class Solution {\n"
+                "    public int[] twoSum(int[] nums, int target) {\n"
+                "        // Write your solution here\n"
+                "        java.util.Map<Integer, Integer> seen = new java.util.HashMap<>();\n"
+                "        for (int i = 0; i < nums.length; i++) {\n"
+                "            int comp = target - nums[i];\n"
+                "            if (seen.containsKey(comp)) {\n"
+                "                return new int[]{seen.get(comp), i};\n"
+                "            }\n"
+                "            seen.put(nums[i], i);\n"
+                "        }\n"
+                "        return new int[]{};\n"
+                "    }\n"
+                "}\n"
             )
         },
         "entrypoint": "two_sum",
         "js_entrypoint": "twoSum",
+        "java_method": "twoSum",
         "test_cases": [
             # 3 Open Test Cases (Visible in UI)
             TestCase(
@@ -338,10 +356,31 @@ CHALLENGES = {
                 "    }\n"
                 "    return stack.length === 0;\n"
                 "}\n"
+            ),
+            "java": (
+                "class Solution {\n"
+                "    public boolean isValid(String s) {\n"
+                "        // Return true if s has valid balanced parentheses, else false\n"
+                "        java.util.Stack<Character> stack = new java.util.Stack<>();\n"
+                "        for (char c : s.toCharArray()) {\n"
+                "            if (c == '(' || c == '{' || c == '[') {\n"
+                "                stack.push(c);\n"
+                "            } else {\n"
+                "                if (stack.isEmpty()) return false;\n"
+                "                char top = stack.pop();\n"
+                "                if (c == ')' && top != '(') return false;\n"
+                "                if (c == '}' && top != '{') return false;\n"
+                "                if (c == ']' && top != '[') return false;\n"
+                "            }\n"
+                "        }\n"
+                "        return stack.isEmpty();\n"
+                "    }\n"
+                "}\n"
             )
         },
         "entrypoint": "is_valid",
         "js_entrypoint": "isValid",
+        "java_method": "isValid",
         "test_cases": [
             TestCase(
                 id=1,
@@ -880,6 +919,201 @@ __runSuite();
     return results
 
 
+def _generate_java_call(challenge_id: str, method: str, tc_id: int, input_data: Any) -> str:
+    if challenge_id == "two_sum":
+        nums_str = ", ".join(str(x) for x in input_data["nums"])
+        target = input_data["target"]
+        return f"""
+        try {{
+            int[] res = sol.{method}(new int[]{{{nums_str}}}, {target});
+            if (res != null) {{
+                java.util.Arrays.sort(res);
+                System.out.println("RESULT:{tc_id}:" + java.util.Arrays.toString(res));
+            }} else {{
+                System.out.println("RESULT:{tc_id}:null");
+            }}
+        }} catch (Throwable t) {{
+            System.out.println("ERROR:{tc_id}:" + t.toString());
+        }}
+        """
+    elif challenge_id == "valid_parentheses":
+        escaped_s = input_data["s"].replace('"', '\\"')
+        return f"""
+        try {{
+            boolean res = sol.{method}("{escaped_s}");
+            System.out.println("RESULT:{tc_id}:" + res);
+        }} catch (Throwable t) {{
+            System.out.println("ERROR:{tc_id}:" + t.toString());
+        }}
+        """
+    return f'System.out.println("ERROR:{tc_id}:Unsupported Java challenge");'
+
+
+def _run_java_tests(challenge_id: str, source_code: str, test_cases: List[TestCase], method: str) -> List[TestCaseResult]:
+    """Execute Java code against test cases in an isolated subprocess.
+    
+    Checks if javac/java are installed on the host system.
+    If not installed, returns an informative runtime error prompting OpenJDK 17+ installation.
+    If installed, compiles Solution.java + TestRunner.java and executes safely with timeouts.
+    """
+    import time
+    javac_bin = shutil.which("javac")
+    java_bin = shutil.which("java")
+
+    if not javac_bin or not java_bin:
+        results = []
+        for tc in test_cases:
+            results.append(TestCaseResult(
+                test_case_id=tc.id,
+                name=tc.name,
+                input_display=tc.input_display,
+                expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                actual_display="JDK Not Found",
+                passed=False,
+                status="Runtime Error",
+                execution_time_ms=0.0,
+                is_hidden=tc.is_hidden,
+                error="Java execution requires a JDK (javac/java). Please install OpenJDK 17+ or switch language to Python / JavaScript."
+            ))
+        return results
+
+    results = []
+    test_calls = "\n".join([_generate_java_call(challenge_id, method, tc.id, tc.input_data) for tc in test_cases])
+
+    runner_source = f"""
+public class TestRunner {{
+    public static void main(String[] args) {{
+        Solution sol = new Solution();
+{test_calls}
+    }}
+}}
+"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol_file = os.path.join(tmpdir, "Solution.java")
+        runner_file = os.path.join(tmpdir, "TestRunner.java")
+
+        with open(sol_file, "w", encoding="utf-8") as f:
+            f.write(source_code)
+        with open(runner_file, "w", encoding="utf-8") as f:
+            f.write(runner_source)
+
+        t0 = time.time()
+        try:
+            compile_proc = subprocess.run(
+                [javac_bin, "Solution.java", "TestRunner.java"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=8.0
+            )
+            if compile_proc.returncode != 0:
+                err_msg = compile_proc.stderr.strip() or "Java Compilation Error"
+                for tc in test_cases:
+                    results.append(TestCaseResult(
+                        test_case_id=tc.id,
+                        name=tc.name,
+                        input_display=tc.input_display,
+                        expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                        actual_display="Compilation Error",
+                        passed=False,
+                        status="Runtime Error",
+                        execution_time_ms=round((time.time() - t0) * 1000, 1),
+                        is_hidden=tc.is_hidden,
+                        error=err_msg
+                    ))
+                return results
+        except subprocess.TimeoutExpired:
+            for tc in test_cases:
+                results.append(TestCaseResult(
+                    test_case_id=tc.id,
+                    name=tc.name,
+                    input_display=tc.input_display,
+                    expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                    actual_display="Compilation Timeout",
+                    passed=False,
+                    status="Time Limit Exceeded",
+                    execution_time_ms=8000.0,
+                    is_hidden=tc.is_hidden,
+                    error="javac compilation timed out (> 8.0s)"
+                ))
+            return results
+
+        try:
+            run_proc = subprocess.run(
+                [java_bin, "-cp", ".", "TestRunner"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=5.0
+            )
+            total_time_ms = round((time.time() - t0) * 1000, 1)
+
+            output_map = {}
+            for line in run_proc.stdout.splitlines():
+                if line.startswith("RESULT:"):
+                    parts = line.split(":", 2)
+                    if len(parts) == 3:
+                        output_map[int(parts[1])] = ("result", parts[2])
+                elif line.startswith("ERROR:"):
+                    parts = line.split(":", 2)
+                    if len(parts) == 3:
+                        output_map[int(parts[1])] = ("error", parts[2])
+
+            for tc in test_cases:
+                item = output_map.get(tc.id, ("error", "No output generated"))
+                if item[0] == "error":
+                    results.append(TestCaseResult(
+                        test_case_id=tc.id,
+                        name=tc.name,
+                        input_display=tc.input_display,
+                        expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                        actual_display="Error",
+                        passed=False,
+                        status="Runtime Error",
+                        execution_time_ms=round(total_time_ms / max(1, len(test_cases)), 1),
+                        is_hidden=tc.is_hidden,
+                        error=item[1]
+                    ))
+                else:
+                    actual_str = item[1].strip()
+                    passed = False
+                    if isinstance(tc.expected_data, bool):
+                        passed = (actual_str.lower() == str(tc.expected_data).lower())
+                    elif isinstance(tc.expected_data, list):
+                        expected_str = str(sorted(tc.expected_data))
+                        passed = (actual_str.replace(" ", "") == expected_str.replace(" ", ""))
+
+                    disp = actual_str if not tc.is_hidden or passed else "[Hidden Output]"
+                    results.append(TestCaseResult(
+                        test_case_id=tc.id,
+                        name=tc.name,
+                        input_display=tc.input_display,
+                        expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                        actual_display=disp,
+                        passed=passed,
+                        status="Passed" if passed else "Wrong Answer",
+                        execution_time_ms=round(total_time_ms / max(1, len(test_cases)), 1),
+                        is_hidden=tc.is_hidden
+                    ))
+
+        except subprocess.TimeoutExpired:
+            for tc in test_cases:
+                results.append(TestCaseResult(
+                    test_case_id=tc.id,
+                    name=tc.name,
+                    input_display=tc.input_display,
+                    expected_display="[Hidden]" if tc.is_hidden else tc.expected_display,
+                    actual_display="Time Limit Exceeded",
+                    passed=False,
+                    status="Time Limit Exceeded",
+                    execution_time_ms=5000.0,
+                    is_hidden=tc.is_hidden,
+                    error="Java execution timed out (> 5.0s). Check for infinite loops."
+                ))
+
+    return results
+
+
 def _run_sql_tests(query: str, test_cases: List[TestCase]) -> List[TestCaseResult]:
     """Execute SQL query against test case SQLite in-memory databases."""
     import time
@@ -954,6 +1188,8 @@ def execute_challenge(
         results = _run_sql_tests(source_code, cases_to_run)
     elif language.lower() in ("javascript", "js"):
         results = _run_javascript_tests(source_code, cases_to_run, chal.get("js_entrypoint", chal.get("entrypoint", "twoSum")))
+    elif language.lower() in ("java",):
+        results = _run_java_tests(chal["id"], source_code, cases_to_run, chal.get("java_method", "twoSum"))
     else:
         results = _run_python_tests(source_code, cases_to_run, chal.get("entrypoint", "two_sum"))
 

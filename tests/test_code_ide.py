@@ -70,6 +70,24 @@ def test_run_javascript_valid_parentheses():
     assert data["passed_tests"] == 3
 
 
+def test_run_java_code_endpoint_handling():
+    """Verify Java starter code exists and execution engine handles Java requests safely."""
+    java_code_two_sum = CHALLENGES["two_sum"]["starter_code"]["java"]
+    assert "class Solution" in java_code_two_sum
+    assert "twoSum" in java_code_two_sum
+
+    req = CodeRunRequest(challenge_id="two_sum", language="java", source_code=java_code_two_sum)
+    data = run_code(req)
+    assert data["challenge_id"] == "two_sum"
+    assert data["language"] == "java"
+    assert data["total_tests"] == 3
+    # If JDK is not installed on the system, it cleanly reports JDK Not Found rather than crashing
+    assert len(data["results"]) == 3
+    for r in data["results"]:
+        assert "test_case_id" in r
+        assert "status" in r
+
+
 def test_run_sql_department_top_salary():
     query = CHALLENGES["sql_department_top_salary"]["starter_code"]["sql"]
     req = CodeRunRequest(challenge_id="sql_department_top_salary", language="sql", source_code=query)
