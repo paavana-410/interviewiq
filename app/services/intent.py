@@ -45,7 +45,7 @@ _MOMENT_PATTERNS = [
 _PASS_PATTERNS = [
     r"\b(i\s+)?(shall|will|can\s+(i|we)|let'?s|please)\s+(pass|skip)\b",
     r"\b(pass|skip)\s*(this|the)?\s*(question)?\b",
-    r"\bi\s+don'?t\s+(know|have\s+an\s+answer|recall|remember|have\s+any\s+idea)\b",
+    r"\bi\s+don'?t\s+(know|have\s+an\s+answer|recall|remember|have\s+any\s+idea|understand|know\s+what('?s|\s+is)\s+happening|know\s+this\s+is\s+happening)\b",
     r"\b(no\s+idea|not\s+sure|not\s+familiar|haven'?t\s+(heard|worked|studied|learned))\b",
     r"\b(move\s+on|next\s+question)\b",
     r"\b(i\s+would\s+like\s+to\s+pass|let\s+us\s+move\s+to\s+next)\b",
@@ -76,12 +76,45 @@ def classify_conversational_intent(transcript: str, question_text: str = "") -> 
     words = clean_no_punct.split()
     word_count = len(words)
 
-    # Empty or near-empty
-    if not clean or word_count == 0:
+    # Empty, near-empty, or common silence/noise ASR hallucinations
+    _SILENCE_ARTIFACTS = {
+        "thank you", "thank you.", "thanks", "thank you for watching", "thank you very much",
+        "subtitles by", "watching", "bye", "bye bye", "silence", "music", "applause",
+        "you", "so", "um", "uh", "okay", "yeah", "yes", "no"
+    }
+    if not clean or word_count == 0 or clean_no_punct in _SILENCE_ARTIFACTS or word_count < 3:
+        # Check if candidate explicitly passed or asked to repeat even in <= 2 words
+        is_pass_short = False
+        for p in _PASS_PATTERNS:
+            if re.search(p, clean_no_punct):
+                is_pass_short = True
+                break
+        if is_pass_short:
+            return IntentResult(
+                intent=ConversationalIntent.PASS,
+                is_conversational=True,
+                interviewer_reply="Understood. Let's move on to the next question.",
+                action="pass_question",
+            )
+
+        is_repeat_short = False
+        for p in _REPEAT_PATTERNS:
+            if re.search(p, clean_no_punct):
+                is_repeat_short = True
+                break
+        if is_repeat_short:
+            q_mention = f"The question is: {question_text}" if question_text else "Let me repeat the question for you."
+            return IntentResult(
+                intent=ConversationalIntent.REPEAT,
+                is_conversational=True,
+                interviewer_reply=f"Certainly! {q_mention}",
+                action="repeat_question",
+            )
+
         return IntentResult(
             intent=ConversationalIntent.NEED_MOMENT,
             is_conversational=True,
-            interviewer_reply="I didn't catch that. Take a moment, and whenever you're ready, click Start Answer.",
+            interviewer_reply="I didn't hear your response clearly. Please click Start Answer and speak into your microphone.",
             action="pause_and_wait",
         )
 

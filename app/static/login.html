@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>InterviewIQ – Sign In</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F3F7F7;
+      --card-bg:#FFFFFF;
+      --primary:#2EC866;
+      --primary-hover:#1BA94C;
+      --danger:#EA3920;
+    }
+    body{font-family:'Open Sans',Arial,sans-serif;background:var(--bg);display:flex;justify-content:center;align-items:center;min-height:100vh;}
+    .login-card{background:var(--card-bg);border:1px solid #E7EEEF;border-radius:8px;padding:2rem 2.5rem;max-width:380px;width:100%;box-shadow:0 2px 6px rgba(0,0,0,0.05);}
+    h1{font-size:1.5rem;color:#0E141E;margin-bottom:0.5rem;text-align:center;}
+    .msg{color:#EA3920;margin-top:0.5rem;text-align:center;display:none;}
+    label{display:block;font-size:0.85rem;color:#576871;margin-top:1rem;}
+    input{width:100%;padding:0.5rem;margin-top:0.3rem;border:1px solid #CED4DA;border-radius:4px;font-size:0.9rem;}
+    .actions{display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-size:0.85rem;}
+    .actions a{color:var(--primary);text-decoration:none;}
+    .actions a:hover{color:var(--primary-hover);}
+    button{width:100%;padding:0.6rem;margin-top:1.2rem;background:var(--primary);color:#fff;border:none;border-radius:4px;font-size:1rem;cursor:pointer;transition:background 0.2s;}
+    button:hover{background:var(--primary-hover);}
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Sign In</h1>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required placeholder="you@example.com">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required placeholder="••••••••">
+      <div class="actions">
+        <label><input type="checkbox" id="rememberMe"> Remember me</label>
+        <a href="#" id="forgot">Forgot?</a>
+      </div>
+      <button type="submit">Log In</button>
+      <div class="msg" id="errorMsg">Invalid credentials</div>
+    </form>
+  </div>
+  <script>
+    // Prefill if remembered
+    const stored = localStorage.getItem('username');
+    if (stored) {
+      document.getElementById('email').value = stored;
+    }
+    document.getElementById('loginForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const err = document.getElementById('errorMsg');
+      err.style.display = 'none';
+      const username = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const remember = document.getElementById('rememberMe').checked;
+
+      if (!username || !password) {
+        err.textContent = 'Please enter both username/email and password';
+        err.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/interview/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          err.textContent = data.detail || 'Invalid username or password.';
+          err.style.display = 'block';
+          return;
+        }
+
+        localStorage.setItem('user_id', data.user_id);
+        localStorage.setItem('username', data.username);
+        window.location.href = '/ui/';
+      } catch(ex) {
+        err.textContent = 'Network error connecting to server';
+        err.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -339,100 +339,302 @@
     </a>
     <div class="nav-links">
       <a href="/ui/" class="nav-item active">Practice</a>
-      <a href="#" class="nav-item">Certification</a>
-      <a href="#" class="nav-item">Leaderboard</a>
     </div>
   </div>
   <div class="nav-right">
-    <div class="proctor-live-tag">
-      <span class="live-dot"></span>
-      <span>Proctored Environment Active</span>
-    </div>
+    <a href="#" id="logout-btn" class="nav-item" style="display:none;">Logout</a>
   </div>
 </nav>
 
 <!-- ── Page Body ── -->
 <div class="page-body">
-<div class="card">
-  <div class="card-header-badge">Placement Assessment Track</div>
-  <h1>Start Your Technical Assessment</h1>
-  <p class="sub">Configure your virtual interview — structured algorithmic, architectural &amp; behavioral problems with progressive follow-up probes and real-time AI scoring.</p>
 
-  <!-- Category / Mode -->
-  <label>Assessment Domain</label>
-  <div class="grid-3" id="modeGrid">
-    <div class="opt-card active" data-mode="mixed">
-      <div class="opt-title">Mixed Track</div>
-      <div class="opt-desc">HR + Core CS + Behavioral</div>
+  <!-- VIEW 1: AUTH PAGE ONLY (Shown when not logged in) -->
+  <div class="card" id="authCard" style="max-width:440px;">
+    <div style="text-align:center;margin-bottom:1.5rem;">
+      <div style="width:40px;height:40px;background:#2EC866;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#0D141E;font-size:1.2rem;font-weight:800;font-family:'Source Code Pro',monospace;margin-bottom:0.75rem;">IQ</div>
+      <h1 id="authMainTitle" style="font-size:1.45rem;color:#0E141E;font-weight:700;">Sign In to InterviewIQ</h1>
+      <p style="color:#576871;font-size:0.88rem;margin-top:0.3rem;">Please authenticate to access your assessment session.</p>
     </div>
-    <div class="opt-card" data-mode="behavioral">
-      <div class="opt-title">Behavioral</div>
-      <div class="opt-desc">STAR leadership &amp; team</div>
+
+    <div id="authErrorBox" style="color:#EA3920;background:#FDEBE9;border:1px solid #F9C0BA;padding:0.65rem 0.9rem;border-radius:6px;font-size:0.85rem;font-weight:600;margin-bottom:1rem;display:none;"></div>
+
+    <!-- Login Form -->
+    <div id="loginFormSection">
+      <div style="margin-bottom:0.9rem;">
+        <label style="margin-top:0;margin-bottom:0.35rem;">Username or Email</label>
+        <input type="text" id="loginUsernameInput" placeholder="Enter your username" style="width:100%;padding:0.7rem;border:1px solid #CED4DA;border-radius:6px;font-size:0.92rem;outline:none;"/>
+      </div>
+      <div style="margin-bottom:1.1rem;">
+        <label style="margin-top:0;margin-bottom:0.35rem;">Password</label>
+        <input type="password" id="loginPasswordInput" placeholder="Enter your password" style="width:100%;padding:0.7rem;border:1px solid #CED4DA;border-radius:6px;font-size:0.92rem;outline:none;"/>
+      </div>
+      <button id="loginSubmitBtn" class="btn-start" style="margin-top:0;background:#2EC866;">Sign In</button>
+      <p style="margin-top:1.1rem;font-size:0.86rem;color:#576871;text-align:center;">
+        New candidate? <a href="#" id="toggleToRegisterLink" style="color:#00A843;font-weight:700;text-decoration:none;">Create an account</a>
+      </p>
     </div>
-    <div class="opt-card" data-mode="technical">
-      <div class="opt-title">Technical</div>
-      <div class="opt-desc">Algorithms, DS &amp; System</div>
+
+    <!-- Register Form -->
+    <div id="registerFormSection" style="display:none;">
+      <div style="margin-bottom:0.9rem;">
+        <label style="margin-top:0;margin-bottom:0.35rem;">Choose Username</label>
+        <input type="text" id="regUsernameInput" placeholder="At least 2 characters" style="width:100%;padding:0.7rem;border:1px solid #CED4DA;border-radius:6px;font-size:0.92rem;outline:none;"/>
+      </div>
+      <div style="margin-bottom:1.1rem;">
+        <label style="margin-top:0;margin-bottom:0.35rem;">Choose Password</label>
+        <input type="password" id="regPasswordInput" placeholder="At least 4 characters" style="width:100%;padding:0.7rem;border:1px solid #CED4DA;border-radius:6px;font-size:0.92rem;outline:none;"/>
+      </div>
+      <button id="registerSubmitBtn" class="btn-start" style="margin-top:0;background:#2EC866;">Register &amp; Continue</button>
+      <p style="margin-top:1.1rem;font-size:0.86rem;color:#576871;text-align:center;">
+        Already registered? <a href="#" id="toggleToLoginLink" style="color:#00A843;font-weight:700;text-decoration:none;">Sign in here</a>
+      </p>
     </div>
   </div>
 
-  <!-- Difficulty & Follow-Up Structure -->
-  <label>Difficulty Level &amp; Question Depth</label>
-  <div id="diffGrid">
-    <!-- Easy: 5 Questions -->
-    <div class="diff-card active" data-diff="easy">
-      <div class="diff-info">
-        <h4><span class="diff-dot diff-dot--easy"></span> Easy</h4>
-        <p>1 Core Question + 1 Follow-up + 1 Core + 2 Follow-ups</p>
+  <!-- VIEW 2: ASSESSMENT DOMAIN PAGE (Shown ONLY after login) -->
+  <div class="card" id="assessmentDomainCard" style="display:none;max-width:580px;">
+    <!-- Logged in status banner -->
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#EAF8ED;border:1px solid #B4E8C2;border-radius:6px;padding:0.65rem 0.95rem;margin-bottom:1.3rem;">
+      <div style="font-size:0.88rem;color:#0E141E;">
+        Signed in as <strong id="domainLoggedUsername" style="color:#00A843;"></strong>
       </div>
-      <div class="diff-pill">5 Questions</div>
+      <a href="#" id="domainLogoutBtn" style="color:#EA3920;font-size:0.82rem;font-weight:700;text-decoration:none;">Logout</a>
     </div>
 
-    <!-- Medium: 6 Questions -->
-    <div class="diff-card" data-diff="medium">
-      <div class="diff-info">
-        <h4><span class="diff-dot diff-dot--medium"></span> Medium</h4>
-        <p>3 Core Questions + 3 Targeted Follow-up Probes</p>
+    <h1 style="margin-bottom:0.4rem;font-size:1.55rem;">Start Virtual Interview</h1>
+    <p class="sub" style="margin-bottom:1.4rem;">Select your assessment track and difficulty level below.</p>
+
+    <!-- Assessment Domain Grid -->
+    <label style="margin-top:0;">Assessment Domain</label>
+    <div class="grid-3" id="modeGrid">
+      <div class="opt-card active" data-mode="mixed">
+        <div class="opt-title">Mixed Track</div>
+        <div class="opt-desc">HR + Core CS + Behavioral</div>
       </div>
-      <div class="diff-pill">6 Questions</div>
+      <div class="opt-card" data-mode="behavioral">
+        <div class="opt-title">Behavioral</div>
+        <div class="opt-desc">STAR leadership &amp; team</div>
+      </div>
+      <div class="opt-card" data-mode="technical">
+        <div class="opt-title">Technical</div>
+        <div class="opt-desc">Algorithms, DS &amp; System</div>
+      </div>
     </div>
 
-    <!-- Hard: 7 Questions -->
-    <div class="diff-card" data-diff="hard">
-      <div class="diff-info">
-        <h4><span class="diff-dot diff-dot--hard"></span> Hard</h4>
-        <p>Deep-dive architecture, distributed edge cases &amp; pressure tests</p>
+    <!-- Difficulty Level (NO SMALL TEXTS BELOW) -->
+    <label>Difficulty Level</label>
+    <div id="diffGrid">
+      <div class="diff-card active" data-diff="easy">
+        <div class="diff-info">
+          <h4><span class="diff-dot diff-dot--easy"></span> Easy</h4>
+        </div>
+        <div class="diff-pill" id="pillEasy">6 Questions</div>
       </div>
-      <div class="diff-pill">7 Questions</div>
+
+      <div class="diff-card" data-diff="medium">
+        <div class="diff-info">
+          <h4><span class="diff-dot diff-dot--medium"></span> Medium</h4>
+        </div>
+        <div class="diff-pill" id="pillMedium">8 Questions</div>
+      </div>
+
+      <div class="diff-card" data-diff="hard">
+        <div class="diff-info">
+          <h4><span class="diff-dot diff-dot--hard"></span> Hard</h4>
+        </div>
+        <div class="diff-pill" id="pillHard">9 Questions</div>
+      </div>
     </div>
+
+    <!-- Security & Proctoring Status Info -->
+    <div style="margin-top:1.3rem;padding:0.75rem 1rem;background:#F8FAFA;border:1px solid #E7EEEF;border-radius:6px;font-size:0.8rem;color:#39424E;display:flex;align-items:center;gap:0.7rem;">
+      <span style="font-size:1.2rem;">🛡️</span>
+      <div style="line-height:1.4;">
+        <strong>Security &amp; Proctoring Enforced:</strong> Live Vision AI, mobile phone detection, off-screen gaze tracking &amp; acoustic multi-voice audit active across all levels (Easy, Medium &amp; Hard).
+      </div>
+    </div>
+
+    <button class="btn-start" id="startBtn" style="margin-top:1.3rem;">Start Virtual Interview →</button>
+    <div id="err" style="display:none;color:#EA3920;margin-top:0.8rem;text-align:center;font-weight:600;font-size:0.85rem;"></div>
   </div>
 
-  <!-- Proctoring & Environmental Readiness Notice -->
-  <div class="proctor-notice">
-    <span class="proctor-notice-icon">🛡️</span>
-    <div style="line-height:1.45;">
-      <strong>Proctored Environment Active:</strong> Webcam &amp; microphone permissions required. Fullscreen lockdown, eye-gaze tracking, and mobile device detection will be enforced.
-    </div>
-  </div>
-
-  <button class="btn-start" id="startBtn">Enter Interview Room →</button>
-  <div id="err"></div>
-</div><!-- end card -->
 </div><!-- end page-body -->
 
 <script>
+  // UI View Controllers
+  function showAuthView(){
+    document.getElementById("authCard").style.display = "block";
+    document.getElementById("assessmentDomainCard").style.display = "none";
+    const topLogout = document.getElementById("logout-btn");
+    if(topLogout) topLogout.style.display = "none";
+  }
+
+  function showAssessmentDomainView(username){
+    document.getElementById("authCard").style.display = "none";
+    document.getElementById("assessmentDomainCard").style.display = "block";
+    document.getElementById("domainLoggedUsername").textContent = username;
+    const topLogout = document.getElementById("logout-btn");
+    if(topLogout) topLogout.style.display = "inline";
+  }
+
+  function displayAuthError(msg){
+    const eb = document.getElementById("authErrorBox");
+    eb.textContent = msg;
+    eb.style.display = "block";
+  }
+
+  function clearAuthError(){
+    const eb = document.getElementById("authErrorBox");
+    eb.textContent = "";
+    eb.style.display = "none";
+  }
+
+  // Toggle between Login and Register inside Auth Card
+  document.getElementById("toggleToRegisterLink").addEventListener("click", e => {
+    e.preventDefault();
+    clearAuthError();
+    document.getElementById("loginFormSection").style.display = "none";
+    document.getElementById("registerFormSection").style.display = "block";
+    document.getElementById("authMainTitle").textContent = "Create an Account";
+  });
+
+  document.getElementById("toggleToLoginLink").addEventListener("click", e => {
+    e.preventDefault();
+    clearAuthError();
+    document.getElementById("registerFormSection").style.display = "none";
+    document.getElementById("loginFormSection").style.display = "block";
+    document.getElementById("authMainTitle").textContent = "Sign In to InterviewIQ";
+  });
+
+  // Login handler
+  document.getElementById("loginSubmitBtn").addEventListener("click", async () => {
+    clearAuthError();
+    const username = document.getElementById("loginUsernameInput").value.trim();
+    const password = document.getElementById("loginPasswordInput").value;
+    if(!username || !password){
+      displayAuthError("Please enter both username and password.");
+      return;
+    }
+    const btn = document.getElementById("loginSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+    try {
+      const res = await fetch("/interview/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        displayAuthError(data.detail || data.error || "Invalid username or password.");
+        return;
+      }
+      localStorage.setItem("user_id", data.user_id);
+      localStorage.setItem("username", data.username);
+      showAssessmentDomainView(data.username);
+    } catch(e){
+      displayAuthError("Network error: Unable to connect to server.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Sign In";
+    }
+  });
+
+  // Register handler
+  document.getElementById("registerSubmitBtn").addEventListener("click", async () => {
+    clearAuthError();
+    const username = document.getElementById("regUsernameInput").value.trim();
+    const password = document.getElementById("regPasswordInput").value;
+    if(!username || !password){
+      displayAuthError("Please enter both username and password.");
+      return;
+    }
+    const btn = document.getElementById("registerSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Creating account…";
+    try {
+      const res = await fetch("/interview/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        displayAuthError(data.detail || data.error || "Registration failed.");
+        return;
+      }
+      localStorage.setItem("user_id", data.user_id);
+      localStorage.setItem("username", data.username);
+      showAssessmentDomainView(data.username);
+    } catch(e){
+      displayAuthError("Network error: Unable to connect to server.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Register & Continue";
+    }
+  });
+
+  // Logout handlers
+  function logoutUser(){
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("username");
+    showAuthView();
+    clearAuthError();
+  }
+
+  document.getElementById("domainLogoutBtn").addEventListener("click", e => {
+    e.preventDefault();
+    logoutUser();
+  });
+
+  const topLogout = document.getElementById("logout-btn");
+  if(topLogout){
+    topLogout.addEventListener("click", e => {
+      e.preventDefault();
+      logoutUser();
+    });
+  }
+
+  // Check saved session on page load
+  window.addEventListener("load", () => {
+    const savedUserId = localStorage.getItem("user_id");
+    const savedUsername = localStorage.getItem("username");
+    if(savedUserId && savedUsername){
+      showAssessmentDomainView(savedUsername);
+    } else {
+      showAuthView();
+    }
+  });
+
+  // Mode and Difficulty selection
   let selectedMode = "mixed";
   let selectedDiff = "easy";
 
-  // Mode click
+  function updatePills(mode){
+    const pE = document.getElementById("pillEasy");
+    const pM = document.getElementById("pillMedium");
+    const pH = document.getElementById("pillHard");
+    if(mode === "mixed"){
+      if(pE) pE.textContent = "6 Questions";
+      if(pM) pM.textContent = "8 Questions";
+      if(pH) pH.textContent = "9 Questions";
+    } else {
+      if(pE) pE.textContent = "5 Questions";
+      if(pM) pM.textContent = "6 Questions";
+      if(pH) pH.textContent = "7 Questions";
+    }
+  }
+
   document.querySelectorAll(".opt-card").forEach(el => {
     el.onclick = () => {
       document.querySelectorAll(".opt-card").forEach(x => x.classList.remove("active"));
       el.classList.add("active");
       selectedMode = el.dataset.mode;
+      updatePills(selectedMode);
     };
   });
 
-  // Difficulty click
   document.querySelectorAll(".diff-card").forEach(el => {
     el.onclick = () => {
       document.querySelectorAll(".diff-card").forEach(x => x.classList.remove("active"));
@@ -441,8 +643,15 @@
     };
   });
 
-  // Start
+  // Start Virtual Interview handler
   document.getElementById("startBtn").onclick = async () => {
+    const userId = localStorage.getItem("user_id");
+    if(!userId){
+      showAuthView();
+      displayAuthError("Please sign in before starting the interview.");
+      return;
+    }
+
     const btn = document.getElementById("startBtn");
     const err = document.getElementById("err");
     err.style.display = "none";
@@ -453,7 +662,11 @@
       const r = await fetch("/interview/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: selectedMode, difficulty: selectedDiff })
+        body: JSON.stringify({ 
+          mode: selectedMode, 
+          difficulty: selectedDiff,
+          user_id: parseInt(userId)
+        })
       });
       if(!r.ok){
         const e = await r.json();
@@ -465,7 +678,7 @@
       err.textContent = e.message;
       err.style.display = "block";
       btn.disabled = false;
-      btn.textContent = "Enter Interview Room →";
+      btn.textContent = "Start Virtual Interview →";
     }
   };
 </script>

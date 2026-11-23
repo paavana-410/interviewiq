@@ -67,3 +67,4 @@ page_*.png
 *.db
 *.db-shm
 *.db-wal
+.archive/

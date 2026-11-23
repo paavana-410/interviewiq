@@ -412,3 +412,79 @@ def test_whisper_unavailable_returns_503(monkeypatch):
                 break
             except (PermissionError, FileNotFoundError):
                 time.sleep(0.2)
+
+
+def test_auth_register_and_login(client):
+    """Test user registration and login endpoints."""
+    username = f"user_{os.urandom(4).hex()}"
+    pwd = "SecretPassword123!"
+
+    # 1. Register
+    reg = client.post("/interview/auth/register", json={"username": username, "password": pwd})
+    assert reg.status_code in (200, 201), reg.text
+    data = reg.json()
+    assert data["success"] is True
+    assert data["username"] == username
+    uid = data["user_id"]
+
+    # 2. Login with username
+    login_res = client.post("/interview/auth/login", json={"username": username, "password": pwd})
+    assert login_res.status_code == 200, login_res.text
+    ld = login_res.json()
+    assert ld["success"] is True
+    assert ld["user_id"] == uid
+
+    # 3. Login with invalid password
+    bad_login = client.post("/interview/auth/login", json={"username": username, "password": "wrong"})
+    assert bad_login.status_code == 401
+
+
+def test_pass_question_and_security_event_endpoints(client):
+    """Test /interview/sessions/{id}/pass and /interview/sessions/{id}/security-event."""
+    # 1. Create session
+    s = client.post("/interview/sessions", json={"mode": "mixed", "difficulty": "easy"}).json()
+    sid = s["session_id"]
+
+    # 2. Get first question (Intro)
+    nq1 = client.get(f"/interview/sessions/{sid}/next-question").json()
+    assert nq1["is_intro"] is True
+    intro_qid = nq1["question_id"]
+
+    # 3. Pass the question using the dedicated endpoint
+    pass_res = client.post(f"/interview/sessions/{sid}/pass", json={"question_id": intro_qid})
+    assert pass_res.status_code == 200, pass_res.text
+    pd = pass_res.json()
+    assert pd["success"] is True
+    assert pd["overall_score"] == 0.0
+    assert pd["verdict"] == "passed_zero_score"
+
+    # 4. Next question must NOT be intro_qid again!
+    nq2 = client.get(f"/interview/sessions/{sid}/next-question").json()
+    assert nq2["done"] is False
+    assert nq2["question_id"] != intro_qid
+    assert nq2["is_intro"] is False
+
+    # 5. Record security violations (e.g. phone detected, multi-face, tab switch)
+    sec1 = client.post(f"/interview/sessions/{sid}/security-event", json={
+        "event_type": "phone_detected",
+        "description": "Mobile phone visible",
+        "score_penalty": 5.0
+    })
+    assert sec1.status_code == 200, sec1.text
+    assert sec1.json()["violation_count"] == 1
+    assert sec1.json()["total_penalty"] == 5.0
+
+    sec2 = client.post(f"/interview/sessions/{sid}/security-event", json={
+        "event_type": "multiple_faces",
+        "description": "Second person in frame",
+        "score_penalty": 5.0
+    })
+    assert sec2.status_code == 200, sec2.text
+    assert sec2.json()["violation_count"] == 2
+    assert sec2.json()["total_penalty"] == 10.0
+
+    # 6. Check summary reflects penalty
+    summary = client.get(f"/interview/sessions/{sid}/summary").json()
+    assert summary["session_id"] == sid
+    assert any("Security & Integrity" in sug for sug in summary["improvement_suggestions"])
+

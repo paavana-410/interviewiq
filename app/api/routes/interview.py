@@ -21,7 +21,9 @@ GET  /interview/judge-info
 from __future__ import annotations
 
 import json
+import hashlib
 import random
+import secrets
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -29,7 +31,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import get_settings
 from app.database import get_db
@@ -43,6 +47,7 @@ from app.models.core import (
     SessionMode,
     SessionStatus,
     Transcript,
+    User,
 )
 from app.orchestration.slim_pipeline import (
     SlimResult,
@@ -55,10 +60,6 @@ from app.utils.audio import audio_dep_info, save_upload
 router = APIRouter(prefix="/interview", tags=["interview-ui"])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 _MODE_MAP = {
     "behavioral": [QuestionCategory.BEHAVIORAL, QuestionCategory.HR],
     "technical":  [QuestionCategory.TECHNICAL],
@@ -67,30 +68,10 @@ _MODE_MAP = {
 
 
 def _build_interview_flow(db: Session, mode: str, difficulty: str = "easy", seed: int = 42) -> list[Question]:
-    categories = _MODE_MAP.get(mode, list(QuestionCategory))
-
-    # 1. Base questions (exclude Question 1 which is reserved for candidate introduction)
-    base_qs = (
-        db.query(Question)
-        .filter(
-            Question.category.in_(categories),
-            Question.active_flag == True,
-            Question.question_id != 1,
-            (Question.company_tag == None) | (~Question.company_tag.like("followup_for_%"))
-        )
-        .all()
-    )
-    if not base_qs:
-        base_qs = db.query(Question).filter(Question.active_flag == True, Question.question_id != 1).all()
-
+    """Construct an interview flow adhering strictly to target category & followup proportions."""
     rng = random.Random(seed)
-
-    # Prioritize base questions matching the selected difficulty
-    matching = [q for q in base_qs if (q.difficulty or "").lower() == difficulty.lower()]
-    other = [q for q in base_qs if q not in matching]
-    rng.shuffle(matching)
-    rng.shuffle(other)
-    candidate_bases = matching + other
+    diff = (difficulty or "easy").lower()
+    mode_clean = (mode or "mixed").lower()
 
     def get_followups(base_qid: int) -> list[Question]:
         return (
@@ -102,70 +83,130 @@ def _build_interview_flow(db: Session, mode: str, difficulty: str = "easy", seed
             .all()
         )
 
+    def fetch_bases(cats: list[QuestionCategory], target_diff: str) -> list[Question]:
+        matching = (
+            db.query(Question)
+            .filter(
+                Question.category.in_(cats),
+                Question.active_flag == True,
+                Question.question_id != 1,
+                (Question.difficulty == target_diff),
+                (Question.company_tag == None) | (~Question.company_tag.like("followup_for_%"))
+            )
+            .all()
+        )
+        rng.shuffle(matching)
+        fallback = (
+            db.query(Question)
+            .filter(
+                Question.category.in_(cats),
+                Question.active_flag == True,
+                Question.question_id != 1,
+                (Question.company_tag == None) | (~Question.company_tag.like("followup_for_%")),
+                Question.question_id.notin_([q.question_id for q in matching])
+            )
+            .all()
+        )
+        rng.shuffle(fallback)
+        return matching + fallback
+
     flow: list[Question] = []
-    diff = (difficulty or "easy").lower()
 
-    if diff == "easy":
-        # Target: 5 questions -> 1q + fol + 1q + fol + fol = 5q
-        bases_with_fol = [b for b in candidate_bases if get_followups(b.question_id)]
-        bases_without = [b for b in candidate_bases if b not in bases_with_fol]
-        ordered_bases = bases_with_fol + bases_without
+    if mode_clean == "mixed":
+        # Target proportions:
+        # Easy:   2 Tech + 2 Follow-ups + 2 Beh = 6 Qs
+        # Medium: 3 Tech + 2 Follow-ups + 3 Beh = 8 Qs
+        # Hard:   3 Tech + 3 Follow-ups + 3 Beh = 9 Qs
+        num_tech = 2 if diff == "easy" else 3
+        num_fol = 2 if diff in ("easy", "medium") else 3
+        num_beh = 2 if diff == "easy" else 3
 
-        if len(ordered_bases) >= 2:
-            b1 = ordered_bases[0]
-            b2 = ordered_bases[1]
-            f1 = get_followups(b1.question_id)
-            f2 = get_followups(b2.question_id)
+        tech_bases = fetch_bases([QuestionCategory.TECHNICAL], diff)
+        beh_bases = fetch_bases([QuestionCategory.BEHAVIORAL, QuestionCategory.HR], diff)
 
-            flow.append(b1)
-            if f1: flow.append(f1[0])
-            flow.append(b2)
-            if f2: flow.append(f2[0])
-            if len(f2) > 1:
-                flow.append(f2[1])
-            elif len(f1) > 1:
-                flow.append(f1[1])
-            elif len(ordered_bases) > 2:
-                flow.append(ordered_bases[2])
-        else:
-            flow.extend(ordered_bases[:5])
+        # 1. Add Technical questions with interleaving followups
+        added_fol = 0
+        for i in range(num_tech):
+            if i < len(tech_bases):
+                tb = tech_bases[i]
+                flow.append(tb)
+                fols = get_followups(tb.question_id)
+                if fols and added_fol < num_fol:
+                    flow.append(fols[0])
+                    added_fol += 1
 
-    elif diff == "medium":
-        # Target: 6 questions -> 1q + fol + 1q + fol + 1q + fol = 6q
-        bases_with_fol = [b for b in candidate_bases if get_followups(b.question_id)]
-        bases_without = [b for b in candidate_bases if b not in bases_with_fol]
-        ordered_bases = bases_with_fol + bases_without
+        # Fill any remaining followups if bases didn't have enough
+        while added_fol < num_fol:
+            for tb in tech_bases:
+                fols = get_followups(tb.question_id)
+                for f in fols:
+                    if f not in flow and added_fol < num_fol:
+                        flow.append(f)
+                        added_fol += 1
+            break
 
-        for b in ordered_bases:
-            if len(flow) >= 6: break
-            flow.append(b)
-            f = get_followups(b.question_id)
-            if f and len(flow) < 6:
-                flow.append(f[0])
+        # 2. Add Behavioral questions
+        for i in range(num_beh):
+            if i < len(beh_bases):
+                flow.append(beh_bases[i])
 
-    else:  # "hard"
-        # Target: 7 questions -> 1q + fol + fol + 1q + fol + fol + 1q = 7q
-        bases_with_fol = [b for b in candidate_bases if get_followups(b.question_id)]
-        bases_without = [b for b in candidate_bases if b not in bases_with_fol]
-        ordered_bases = bases_with_fol + bases_without
+    elif mode_clean == "behavioral":
+        # Target proportions:
+        # Easy:   3 Core Beh + 2 Follow-ups = 5 Qs
+        # Medium: 4 Core Beh + 2 Follow-ups = 6 Qs
+        # Hard:   4 Core Beh + 3 Follow-ups = 7 Qs
+        num_beh = 3 if diff == "easy" else 4
+        num_fol = 2 if diff in ("easy", "medium") else 3
 
-        for b in ordered_bases:
-            if len(flow) >= 7: break
-            flow.append(b)
-            f = get_followups(b.question_id)
-            for fol in f:
-                if len(flow) >= 7: break
-                flow.append(fol)
+        beh_bases = fetch_bases([QuestionCategory.BEHAVIORAL, QuestionCategory.HR], diff)
+        added_fol = 0
+        for i in range(num_beh):
+            if i < len(beh_bases):
+                bb = beh_bases[i]
+                flow.append(bb)
+                fols = get_followups(bb.question_id)
+                if fols and added_fol < num_fol:
+                    flow.append(fols[0])
+                    added_fol += 1
 
-    # Ensure minimum 5 questions if pool permits
-    if len(flow) < 5:
-        all_qs = db.query(Question).filter(Question.active_flag == True).all()
-        rng.shuffle(all_qs)
-        for q in all_qs:
-            if q not in flow:
-                flow.append(q)
-            if len(flow) >= 5:
-                break
+        # If any followups left, append
+        while added_fol < num_fol:
+            for bb in beh_bases:
+                fols = get_followups(bb.question_id)
+                for f in fols:
+                    if f not in flow and added_fol < num_fol:
+                        flow.append(f)
+                        added_fol += 1
+            break
+
+    else:  # "technical"
+        # Target proportions:
+        # Easy:   3 Core Tech + 2 Follow-ups = 5 Qs
+        # Medium: 4 Core Tech + 2 Follow-ups = 6 Qs
+        # Hard:   4 Core Tech + 3 Follow-ups = 7 Qs
+        num_tech = 3 if diff == "easy" else 4
+        num_fol = 2 if diff in ("easy", "medium") else 3
+
+        tech_bases = fetch_bases([QuestionCategory.TECHNICAL], diff)
+        added_fol = 0
+        for i in range(num_tech):
+            if i < len(tech_bases):
+                tb = tech_bases[i]
+                flow.append(tb)
+                fols = get_followups(tb.question_id)
+                if fols and added_fol < num_fol:
+                    flow.append(fols[0])
+                    added_fol += 1
+
+        # If any followups left, append
+        while added_fol < num_fol:
+            for tb in tech_bases:
+                fols = get_followups(tb.question_id)
+                for f in fols:
+                    if f not in flow and added_fol < num_fol:
+                        flow.append(f)
+                        added_fol += 1
+            break
 
     return flow
 
@@ -198,18 +239,14 @@ def _set_session_question_ids(session: InterviewSession, ids: list[int], intro_q
 
 
 def _answered_question_ids(session_id: int, db: Session) -> set[int]:
-    """Return the set of question IDs that already have a response + transcript."""
+    """Return the set of question IDs that have been answered in this session."""
     rows = (
-        db.query(Response, Transcript)
-        .join(Transcript, Transcript.response_id == Response.response_id)
-        .filter(Response.session_id == session_id)
+        db.query(Response.question_id)
+        .filter(Response.session_id == session_id, Response.question_id.isnot(None))
+        .distinct()
         .all()
     )
-    result = set()
-    for resp, _ in rows:
-        if resp.question_id:
-            result.add(resp.question_id)
-    return result
+    return {r[0] for r in rows if r[0] is not None}
 
 
 def _get_judge_info() -> dict:
@@ -230,6 +267,21 @@ def _get_judge_info() -> dict:
         return {"provider": "error", "model": str(exc)[:80], "is_mock": False, "error": True}
 
 
+def _hash_password(password: str, salt: str | None = None) -> str:
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"{salt}${hashed}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        salt, _ = stored_hash.split("$", 1)
+        return _hash_password(password, salt) == stored_hash
+    except Exception:
+        return False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Session creation
 # ─────────────────────────────────────────────────────────────────────────────
@@ -238,6 +290,7 @@ class InterviewSessionCreate(BaseModel):
     mode: str = "mixed"          # behavioral | technical | mixed
     difficulty: str = "easy"     # easy | medium | hard
     n_questions: int | None = None
+    user_id: int | None = None
 
 
 class InterviewSessionResponse(BaseModel):
@@ -246,6 +299,7 @@ class InterviewSessionResponse(BaseModel):
     difficulty: str
     n_questions: int
     question_ids: list[int]
+    user_id: int | None = None
 
 
 @router.post("/sessions", response_model=InterviewSessionResponse, status_code=201)
@@ -268,6 +322,7 @@ def create_interview_session(
         )
 
     session = InterviewSession(
+        user_id=body.user_id,
         mode=SessionMode.PRACTICE,
         status=SessionStatus.ACTIVE,
     )
@@ -285,6 +340,7 @@ def create_interview_session(
         difficulty=diff,
         n_questions=len(questions),
         question_ids=[q.question_id for q in questions],
+        user_id=session.user_id,
     )
 
 
@@ -670,7 +726,9 @@ def session_summary(session_id: int, db: Session = Depends(get_db)):
         delivery_score = max(20.0, min(100.0, delivery_score))
 
     content_score = round(avg_content * 100, 1)
-    overall_agg = round((content_score * 0.6) + (delivery_score * 0.4), 1)
+    base_overall = round((content_score * 0.6) + (delivery_score * 0.4), 1)
+    tot_penalty = float(meta.get("total_security_penalty", 0.0))
+    overall_agg = max(0.0, round(base_overall - tot_penalty, 1))
 
     verdict = (
         "Outstanding Placement Ready" if overall_agg >= 80 else
@@ -691,6 +749,9 @@ def session_summary(session_id: int, db: Session = Depends(get_db)):
     )
 
     suggestions = []
+    if tot_penalty > 0:
+        sec_count = len(meta.get("security_violations", []))
+        suggestions.append(f"Security & Integrity: {sec_count} proctoring warning(s) incurred a total -{tot_penalty:.0f}% penalty on final assessment score.")
     if avg_wpm > 165:
         suggestions.append(f"Pacing: Your pace averaged {avg_wpm:.0f} WPM, which is slightly rushed. Aim for 130–150 WPM so your technical explanations carry clarity.")
     elif avg_wpm < 115 and avg_wpm > 0:
@@ -707,6 +768,23 @@ def session_summary(session_id: int, db: Session = Depends(get_db)):
         suggestions.append("Technical Framework: On difficult questions, define the core mechanism first, then outline a real-world scenario and design trade-offs.")
 
     suggestions.append("STAR Method: For behavioral answers, clearly signpost Situation, Task, your specific Action, and measurable Result.")
+
+    # Save final performance into session metadata for placement leaderboard
+    code_subs = meta.get("code_submissions", [])
+    avg_code_score = (sum(s.get("score_percent", 0) for s in code_subs) / len(code_subs)) if code_subs else None
+
+    meta["final_performance"] = {
+        "overall_score": overall_agg,
+        "content_score": content_score,
+        "delivery_score": round(delivery_score, 1),
+        "code_score": round(avg_code_score, 1) if avg_code_score is not None else None,
+        "verdict": verdict,
+        "total_duration_sec": tot_duration,
+        "answered_count": len(core_answers),
+    }
+    session.meta_json = dict(meta)
+    flag_modified(session, "meta_json")
+    db.commit()
 
     ji = _get_judge_info()
     return SessionSummary(
@@ -742,104 +820,359 @@ def get_audio_deps():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Coding & SQL IDE Endpoints (CS Student Practice & Technical Assessments)
+# User Authentication & Campus Placement Leaderboard
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CodeRunRequest(BaseModel):
-    challenge_id: str
-    language: str
-    source_code: str
-    session_id: int | None = None
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    email: str | None = None
 
 
-class CodeSubmitRequest(BaseModel):
-    session_id: int
-    challenge_id: str
-    language: str
-    source_code: str
+class LoginRequest(BaseModel):
+    password: str
+    username: str | None = None
+    username_or_email: str | None = None
 
 
-@router.get("/code/challenges")
-def list_code_challenges():
-    from app.services.code_executor import CHALLENGES, get_challenge_metadata
-    return [get_challenge_metadata(cid) for cid in CHALLENGES]
+class LinkUserRequest(BaseModel):
+    user_id: int
 
 
-@router.get("/code/challenges/{challenge_id}")
-def get_code_challenge(challenge_id: str):
-    from app.services.code_executor import get_challenge_metadata
-    try:
-        return get_challenge_metadata(challenge_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+class SecurityEventRequest(BaseModel):
+    event_type: str  # "phone_detected" | "multiple_faces" | "no_face" | "multiple_voices" | "tab_switch" | "screenshot" | "suspicious_gaze"
+    description: str | None = None
+    score_penalty: float = 5.0
 
 
-@router.post("/code/run")
-def run_code(body: CodeRunRequest, db: Session = Depends(get_db)):
-    from app.services.code_executor import execute_challenge
+class PassQuestionRequest(BaseModel):
+    question_id: int | None = None
 
-    if body.session_id is not None:
-        session = db.get(InterviewSession, body.session_id)
-        if session:
-            meta = getattr(session, "meta_json", None) or {}
-            if isinstance(meta, str):
-                try:
-                    meta = json.loads(meta)
-                except Exception:
-                    meta = {}
-            runs = meta.get("code_run_count", 0)
-            if runs >= 15:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Rate limit reached: Maximum 15 test runs per session reached. Please review your solution and Submit."
-                )
-            meta["code_run_count"] = runs + 1
-            session.meta_json = meta
-            db.commit()
 
-    try:
-        return execute_challenge(
-            challenge_id=body.challenge_id,
-            language=body.language,
-            source_code=body.source_code,
-            mode="run",
+def _seed_demo_leaderboard_if_empty(db: Session):
+    existing = db.query(InterviewSession).filter(InterviewSession.user_id != None).first()
+    if existing:
+        return
+
+    demo_users = [
+        {"name": "Ananya Rao", "email": "ananya.rao@campus.edu", "overall": 92.5, "content": 94.0, "delivery": 90.0, "code": 100.0, "verdict": "Outstanding Placement Ready"},
+        {"name": "Rahul Sharma", "email": "rahul.s@campus.edu", "overall": 86.0, "content": 88.0, "delivery": 83.0, "code": 83.3, "verdict": "Outstanding Placement Ready"},
+        {"name": "Vikramaditya S", "email": "vikram.s@campus.edu", "overall": 74.5, "content": 76.0, "delivery": 72.0, "code": 66.7, "verdict": "Strong Performance"},
+    ]
+    for d in demo_users:
+        u = db.query(User).filter(User.email == d["email"]).first()
+        if not u:
+            u = User(
+                name=d["name"],
+                email=d["email"],
+                password_hash=_hash_password("DemoPass123!"),
+                role="student"
+            )
+            db.add(u)
+            db.flush()
+
+        s = InterviewSession(
+            user_id=u.user_id,
+            mode=SessionMode.PRACTICE,
+            status=SessionStatus.COMPLETED,
+            meta_json={
+                "final_performance": {
+                    "overall_score": d["overall"],
+                    "content_score": d["content"],
+                    "delivery_score": d["delivery"],
+                    "code_score": d["code"],
+                    "verdict": d["verdict"],
+                    "total_duration_sec": 340,
+                    "answered_count": 5,
+                }
+            }
         )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        db.add(s)
+    db.commit()
 
 
-@router.post("/code/submit")
-def submit_code(body: CodeSubmitRequest, db: Session = Depends(get_db)):
-    from app.services.code_executor import execute_challenge
-    session = db.get(InterviewSession, body.session_id)
+@router.post("/auth/register")
+def register_user(body: RegisterRequest, db: Session = Depends(get_db)):
+    username = body.username.strip()
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="Username must be at least 2 characters long.")
+    if len(body.password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters long.")
+
+    email = (body.email or f"{username}@example.com").strip().lower()
+
+    existing_name = db.query(User).filter(func.lower(User.name) == username.lower()).first()
+    if existing_name:
+        raise HTTPException(status_code=400, detail="This username is already taken.")
+
+    existing_email = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="An account with this email already exists.")
+
+    pwd_hash = _hash_password(body.password)
+    user = User(
+        name=username,
+        email=email,
+        password_hash=pwd_hash,
+        role="student"
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "success": True,
+        "message": "User registered successfully",
+        "user_id": user.user_id,
+        "username": user.name,
+        "email": user.email,
+        "user": {
+            "user_id": user.user_id,
+            "username": user.name,
+            "email": user.email,
+            "role": user.role,
+        }
+    }
+
+
+@router.get("/auth/ping")
+def ping():
+    return {"status": "ok"}
+
+
+@router.post("/auth/login")
+def login_user(body: LoginRequest, db: Session = Depends(get_db)):
+    ident = (body.username or body.username_or_email or "").strip()
+    if not ident or not body.password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+
+    user = (
+        db.query(User)
+        .filter((func.lower(User.email) == ident.lower()) | (func.lower(User.name) == ident.lower()))
+        .first()
+    )
+    if not user or not _verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username/email or password.")
+
+    return {
+        "success": True,
+        "message": "Login successful",
+        "user_id": user.user_id,
+        "username": user.name,
+        "email": user.email,
+        "user": {
+            "user_id": user.user_id,
+            "username": user.name,
+            "email": user.email,
+            "role": user.role,
+        }
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Security Event & Fullscreen Integrity Recording
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/security-event")
+def record_security_event(session_id: int, body: SecurityEventRequest, db: Session = Depends(get_db)):
+    session = db.get(InterviewSession, session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Interview session not found")
-    try:
-        res = execute_challenge(
-            challenge_id=body.challenge_id,
-            language=body.language,
-            source_code=body.source_code,
-            mode="submit",
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
+    meta = getattr(session, "meta_json", None) or {}
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
+
+    violations = meta.get("security_violations", [])
+    violations.append({
+        "event_type": body.event_type,
+        "description": body.description,
+        "score_penalty": body.score_penalty,
+    })
+    meta["security_violations"] = violations
+    tot_penalty = meta.get("total_security_penalty", 0.0) + body.score_penalty
+    meta["total_security_penalty"] = tot_penalty
+
+    # If final performance is present, update the score immediately
+    if "final_performance" in meta and isinstance(meta["final_performance"], dict):
+        base = meta["final_performance"].get("base_overall_score")
+        if base is None:
+            base = meta["final_performance"].get("overall_score", 0.0)
+            meta["final_performance"]["base_overall_score"] = base
+        meta["final_performance"]["overall_score"] = max(0.0, round(base - tot_penalty, 1))
+
+    session.meta_json = dict(meta)
+    flag_modified(session, "meta_json")
+    db.commit()
+    return {
+        "success": True,
+        "session_id": session_id,
+        "event_type": body.event_type,
+        "violation_count": len(violations),
+        "total_penalty": tot_penalty
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dedicated Pass Question Endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/pass")
+def pass_question_endpoint(
+    session_id: int,
+    body: PassQuestionRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    session = db.get(InterviewSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    qid = body.question_id if body and body.question_id else None
+    if not qid:
+        all_ids = _session_question_ids(session)
+        answered = _answered_question_ids(session_id, db)
         meta = getattr(session, "meta_json", None) or {}
         if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except Exception:
-                meta = {}
-        code_submissions = meta.get("code_submissions", [])
-        code_submissions.append({
-            "challenge_id": body.challenge_id,
-            "language": body.language,
-            "score_percent": res["score_percent"],
-            "all_passed": res["all_passed"],
-            "passed_tests": res["passed_tests"],
-            "total_tests": res["total_tests"],
-            "source_code": body.source_code,
-        })
-        meta["code_submissions"] = code_submissions
-        session.meta_json = meta
-        db.commit()
-        return res
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            try: meta = json.loads(meta)
+            except Exception: meta = {}
+        intro_qid = meta.get("intro_qid", 1)
+        if intro_qid not in answered:
+            qid = intro_qid
+        else:
+            remaining = [q for q in all_ids if q not in answered]
+            if not remaining:
+                return {"done": True, "message": "All questions answered"}
+            qid = remaining[0]
+
+    resp = Response(
+        session_id=session_id,
+        question_id=qid,
+        audio_path=None,
+    )
+    db.add(resp)
+    db.flush()
+
+    t = Transcript(
+        response_id=resp.response_id,
+        transcript_text="(Candidate passed this question without answering)",
+        word_timestamps=[],
+        stt_model="none",
+        confidence=1.0,
+        source="passed",
+    )
+    db.add(t)
+
+    dm = DeliveryMetrics(
+        response_id=resp.response_id,
+        speaking_rate=0.0,
+        pause_count=0,
+        long_pause_count=0,
+        filler_count=0,
+        filler_density=0.0,
+        repetition_count=0,
+        duration_sec=0,
+        detail_json={"delivery_score": 0.0, "status": "passed_zero_score"},
+    )
+    db.add(dm)
+
+    ce = ContentEvaluation(
+        response_id=resp.response_id,
+        correctness_score=0.0,
+        coverage_score=0.0,
+        relevance_score=0.0,
+        completeness_score=0.0,
+        star_score=0.0,
+        overall_score=0.0,
+        evidence_json={
+            "verdict": "passed_zero_score",
+            "reason": "Candidate explicitly passed question — evaluated as 0 score for delivery and content",
+            "interviewer_reply": "No worries at all — let's move forward to the next question.",
+        },
+        used_delivery_features=False,
+    )
+    db.add(ce)
+    db.commit()
+
+    return {
+        "success": True,
+        "response_id": resp.response_id,
+        "question_id": qid,
+        "overall_score": 0.0,
+        "verdict": "passed_zero_score",
+        "interviewer_reply": "No worries at all — let's move forward to the next question.",
+        "transcript": "(Candidate passed this question without answering)",
+    }
+
+
+@router.post("/sessions/{session_id}/link-user")
+def link_session_user(session_id: int, body: LinkUserRequest, db: Session = Depends(get_db)):
+    session = db.get(InterviewSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    user = db.get(User, body.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    session.user_id = user.user_id
+    db.commit()
+    return {"success": True, "session_id": session_id, "user_id": user.user_id, "username": user.name}
+
+
+@router.get("/leaderboard")
+def get_leaderboard(db: Session = Depends(get_db)):
+    """Return student scores ranked on the placement leaderboard."""
+    _seed_demo_leaderboard_if_empty(db)
+
+    sessions = (
+        db.query(InterviewSession)
+        .filter(InterviewSession.user_id != None)
+        .order_by(InterviewSession.started_at.desc())
+        .all()
+    )
+
+    user_best: dict[int, dict] = {}
+    for s in sessions:
+        meta = getattr(s, "meta_json", None) or {}
+        if isinstance(meta, str):
+            try: meta = json.loads(meta)
+            except: meta = {}
+
+        perf = meta.get("final_performance")
+        if not perf:
+            continue
+
+        uid = s.user_id
+        score = perf.get("overall_score", 0)
+        user = db.get(User, uid)
+        if not user:
+            continue
+
+        if uid not in user_best or score > user_best[uid]["overall_score"]:
+            user_best[uid] = {
+                "user_id": uid,
+                "username": user.name,
+                "email": user.email,
+                "overall_score": score,
+                "content_score": perf.get("content_score", 0),
+                "delivery_score": perf.get("delivery_score", 0),
+                "code_score": perf.get("code_score"),
+                "verdict": perf.get("verdict", "Evaluated"),
+                "session_id": s.session_id,
+                "mode": s.mode.value if hasattr(s.mode, "value") else str(s.mode),
+                "completed_at": s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "Recently",
+            }
+
+    ranked = sorted(
+        user_best.values(),
+        key=lambda x: (x["overall_score"], x["code_score"] or 0),
+        reverse=True,
+    )
+
+    for idx, item in enumerate(ranked):
+        item["rank"] = idx + 1
+
+    return ranked
+
+
+

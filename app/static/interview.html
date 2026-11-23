@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -112,6 +112,24 @@
       font-weight:600;
       font-family:'Source Code Pro', monospace;
     }
+    .nav-exit-btn{
+      background:rgba(234,57,32,0.12);
+      color:#EA3920;
+      border:1px solid rgba(234,57,32,0.35);
+      border-radius:6px;
+      padding:0.25rem 0.65rem;
+      font-size:0.75rem;
+      font-weight:700;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:0.3rem;
+      transition:all 0.15s ease;
+    }
+    .nav-exit-btn:hover{
+      background:#EA3920;
+      color:#FFFFFF;
+    }
 
     /* ── Page Layout ── */
     .page-body{
@@ -123,7 +141,7 @@
     }
     .room-container{
       width:100%;
-      max-width:880px;
+      max-width:1020px;
     }
 
     /* ── Section Label above card ── */
@@ -153,8 +171,11 @@
       border:1px solid var(--border);
       border-radius:8px;
       box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-      padding:2rem 2.4rem;
+      padding:2.2rem 2.6rem;
       position:relative;
+      min-height:480px;
+      display:flex;
+      flex-direction:column;
     }
 
     /* ── AI Avatar Bar ── */
@@ -246,26 +267,6 @@
       line-height:1.65;
       margin-bottom:1.4rem;
     }
-    .intro-checklist{
-      background:#f0f9ff;
-      border:1px solid #bae6fd;
-      border-radius:12px;
-      padding:1.1rem 1.3rem;
-      margin-bottom:1.6rem;
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:0.8rem;
-    }
-    .check-item{
-      display:flex;
-      align-items:center;
-      gap:0.5rem;
-      font-size:0.84rem;
-      color:#0369a1;
-      font-weight:500;
-    }
-    .check-icon{color:#059669;font-weight:700;font-size:0.9rem}
-
     /* ── Question View ── */
     #questionView{display:none}
     .question-meta{
@@ -676,7 +677,7 @@
       50%{opacity:0.85;transform:scale(1.04)}
     }
     .proctor-stats-bar{
-      padding:6px 10px;
+      padding:6px 12px;
       background:#F8FAFA;
       border-top:1px solid #E7EEEF;
       display:flex;
@@ -684,25 +685,26 @@
       align-items:center;
       color:#576871;
       font-weight:600;
-      font-size:0.7rem;
+      font-size:0.75rem;
     }
     .proctor-toast{
       position:fixed;
       top:65px;
       left:50%;
       transform:translateX(-50%);
-      background:#EA3920;
+      background:#2EC866;
       color:#FFFFFF;
-      padding:0.6rem 1.2rem;
-      border-radius:4px;
-      font-size:0.85rem;
+      padding:0.6rem 1.4rem;
+      border-radius:6px;
+      font-size:0.88rem;
       font-weight:700;
-      box-shadow:0 4px 12px rgba(234,57,32,0.3);
+      box-shadow:0 4px 14px rgba(46,200,102,0.35);
       z-index:9999;
       display:none;
       align-items:center;
       gap:0.5rem;
       animation:slideDown 0.3s ease;
+      letter-spacing:0.02em;
     }
     @keyframes slideDown{
       from{top:35px;opacity:0}
@@ -730,246 +732,219 @@
       color:#0A6B2E;
     }
 
-    /* ── Strict Screen / Fullscreen Lock Overlay ── */
+    /* ── Elegant Screen / Fullscreen Lock Overlay ── */
     .screen-lock-overlay{
       position:fixed;
       top:0;
       left:0;
       width:100vw;
       height:100vh;
-      background:rgba(13,20,30,0.92);
-      backdrop-filter:blur(10px);
+      background:rgba(15,23,42,0.82);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
       z-index:99999;
       display:none;
       align-items:center;
       justify-content:center;
+      padding:1.5rem;
     }
     .screen-lock-card{
       background:#FFFFFF;
-      max-width:480px;
-      width:90%;
-      border-radius:8px;
-      padding:2.2rem 2rem;
+      max-width:470px;
+      width:100%;
+      border-radius:18px;
+      padding:2.4rem 2.2rem 2.2rem;
       text-align:center;
-      box-shadow:0 20px 48px rgba(0,0,0,0.4);
-      border:2px solid #EA3920;
-      animation:popIn 0.3s cubic-bezier(0.16,1,0.3,1);
+      box-shadow:0 25px 60px -12px rgba(15,23,42,0.35), 0 0 0 1px rgba(15,23,42,0.06);
+      border:none;
+      animation:popIn 0.28s cubic-bezier(0.16,1,0.3,1);
+      position:relative;
     }
     @keyframes popIn{
-      from{transform:scale(0.85);opacity:0}
+      from{transform:scale(0.92);opacity:0}
       to{transform:scale(1);opacity:1}
     }
-    .lock-icon{
-      font-size:3.2rem;
-      margin-bottom:0.8rem;
+    .lock-icon-wrap{
+      width:62px;
+      height:62px;
+      margin:0 auto 1.25rem;
+      border-radius:50%;
+      background:#FEF2F2;
+      border:1px solid #FEE2E2;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:1.85rem;
+      box-shadow:0 8px 24px -4px rgba(239,68,68,0.18);
+    }
+    .lock-icon-wrap.consent{
+      background:#ECFDF5;
+      border:1px solid #D1FAE5;
+      box-shadow:0 8px 24px -4px rgba(16,185,129,0.2);
     }
     .screen-lock-card h2{
-      font-size:1.4rem;
-      font-weight:800;
-      color:#EA3920;
-      margin-bottom:0.6rem;
+      font-size:1.35rem;
+      font-weight:700;
+      color:#0F172A;
+      letter-spacing:-0.02em;
+      margin-bottom:0.5rem;
     }
     .screen-lock-card p{
-      color:#576871;
+      color:#64748B;
       font-size:0.92rem;
-      line-height:1.55;
-      margin-bottom:1.2rem;
+      line-height:1.6;
+      margin-bottom:1.3rem;
     }
     .lock-warning-pill{
       display:inline-flex;
       align-items:center;
-      gap:0.5rem;
-      background:#FDEBE9;
-      color:#C52D1A;
-      padding:0.4rem 1rem;
-      border-radius:4px;
-      font-weight:700;
+      gap:0.55rem;
+      background:#F8FAFC;
+      color:#334155;
+      padding:0.45rem 1.1rem;
+      border-radius:9999px;
+      font-weight:600;
       font-size:0.82rem;
-      border:1px solid #F9C0BA;
+      border:1px solid #E2E8F0;
+      margin-bottom:1.6rem;
+      box-shadow:0 1px 2px rgba(0,0,0,0.04);
     }
-
-    /* ── HackerRank Coding & SQL IDE Styles ── */
-    .stage-tabs{
-      display:flex;
-      gap:0.5rem;
-      margin-bottom:1.1rem;
+    .lock-warning-dot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:#EF4444;
+      display:inline-block;
+      box-shadow:0 0 6px rgba(239,68,68,0.6);
     }
-    .stage-tab-btn{
-      background:#FFFFFF;
-      border:1px solid #E7EEEF;
-      border-radius:6px;
-      padding:0.45rem 0.95rem;
-      font-size:0.83rem;
-      font-weight:700;
-      color:#576871;
+    .btn-modal-primary{
+      background:#059669;
+      color:#FFFFFF;
+      font-weight:600;
+      font-size:0.93rem;
+      padding:0.75rem 1.6rem;
+      border-radius:10px;
+      border:none;
       cursor:pointer;
+      box-shadow:0 4px 14px rgba(5,150,105,0.25);
+      transition:all 0.2s ease;
       display:inline-flex;
       align-items:center;
-      gap:0.45rem;
-      transition:all 0.15s;
-    }
-    .stage-tab-btn:hover{
-      background:#F8FAFA;
-      border-color:#C2C7D0;
-      color:#0E141E;
-    }
-    .stage-tab-btn.active{
-      background:#0D141E;
-      color:#00EA64;
-      border-color:#0D141E;
-      box-shadow:0 1px 3px rgba(0,0,0,0.1);
-    }
-    .ide-container{
-      display:grid;
-      grid-template-columns:1fr 1.25fr;
-      gap:1rem;
-      margin-top:0.4rem;
-    }
-    @media (max-width:960px){
-      .ide-container{ grid-template-columns:1fr; }
-    }
-    .ide-pane-left{
-      background:#FFFFFF;
-      border:1px solid #E7EEEF;
-      border-radius:8px;
-      padding:1.4rem;
-      max-height:580px;
-      overflow-y:auto;
-    }
-    .ide-pane-right{
-      display:flex;
-      flex-direction:column;
-      background:#FFFFFF;
-      border:1px solid #E7EEEF;
-      border-radius:8px;
-      overflow:hidden;
-    }
-    .editor-top-bar{
-      background:#0D141E;
-      padding:0.6rem 0.9rem;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      border-bottom:1px solid #1D2432;
-    }
-    .editor-select{
-      background:#1D2432;
-      color:#00EA64;
-      border:1px solid #2EC866;
-      border-radius:4px;
-      padding:0.3rem 0.65rem;
-      font-size:0.78rem;
-      font-weight:700;
-      outline:none;
-      cursor:pointer;
-    }
-    .code-editor-area{
-      width:100%;
-      height:280px;
-      background:#0D141E;
-      color:#F3F7F7;
-      font-family:'Source Code Pro', monospace;
-      font-size:0.86rem;
-      line-height:1.6;
-      padding:0.9rem;
-      border:none;
-      outline:none;
-      resize:vertical;
-      tab-size:4;
-    }
-    .code-editor-area:focus{
-      outline:none;
-    }
-    .ide-actions-bar{
-      background:#F8FAFA;
-      border-top:1px solid #E7EEEF;
-      padding:0.75rem 1rem;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:0.75rem;
-      flex-wrap:wrap;
-    }
-    .test-results-panel{
-      background:#FFFFFF;
-      border-top:1px solid #E7EEEF;
-      padding:1rem;
-      max-height:230px;
-      overflow-y:auto;
-    }
-    .test-tab-row{
-      display:flex;
       gap:0.4rem;
-      margin-bottom:0.75rem;
-      flex-wrap:wrap;
     }
-    .test-case-tab{
-      padding:0.3rem 0.65rem;
-      border-radius:4px;
-      font-size:0.75rem;
+    .btn-modal-primary:hover{
+      background:#047857;
+      box-shadow:0 6px 20px rgba(5,150,105,0.35);
+      transform:translateY(-1px);
+    }
+    .btn-modal-secondary{
+      background:#F8FAFC;
+      color:#475569;
       font-weight:600;
-      background:#F8FAFA;
-      border:1px solid #E7EEEF;
+      font-size:0.9rem;
+      padding:0.75rem 1.35rem;
+      border-radius:10px;
+      border:1px solid #CBD5E1;
       cursor:pointer;
-      transition:all 0.12s;
+      transition:all 0.2s ease;
     }
-    .test-case-tab:hover{
-      background:#E7EEEF;
+    .btn-modal-secondary:hover{
+      background:#F1F5F9;
+      color:#1E293B;
+      border-color:#94A3B8;
     }
-    .test-case-tab.active{
-      background:#0D141E;
-      color:#00EA64;
-      border-color:#0D141E;
+    .btn-modal-danger{
+      background:#DC2626;
+      color:#FFFFFF;
+      font-weight:600;
+      font-size:0.92rem;
+      padding:0.75rem 1.4rem;
+      border-radius:10px;
+      border:none;
+      cursor:pointer;
+      box-shadow:0 4px 14px rgba(220,38,38,0.25);
+      transition:all 0.2s ease;
     }
-    .test-case-tab.passed{
-      border-color:#2EC866;
-      color:#0A6B2E;
-      background:#EAF8ED;
+    .btn-modal-danger:hover{
+      background:#B91C1C;
+      box-shadow:0 6px 20px rgba(220,38,38,0.35);
+      transform:translateY(-1px);
     }
-    .test-case-tab.failed{
-      border-color:#EA3920;
-      color:#C52D1A;
-      background:#FDEBE9;
+    .modal-close-x{
+      position:absolute;
+      top:16px;
+      right:18px;
+      width:32px;
+      height:32px;
+      border-radius:8px;
+      background:#F1F5F9;
+      border:none;
+      color:#64748B;
+      font-size:1rem;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:all 0.15s ease;
     }
-    .case-detail-box{
-      background:#F8FAFA;
-      border:1px solid #E7EEEF;
-      border-radius:6px;
-      padding:0.75rem 0.9rem;
-      font-size:0.82rem;
-      font-family:'Source Code Pro', monospace;
-      line-height:1.55;
+    .modal-close-x:hover{
+      background:#E2E8F0;
+      color:#0F172A;
     }
   </style>
-  <!-- Lightweight on-device Vision AI for Mobile Phone, Face & 3D Iris/Gaze Proctoring -->
+  <!-- Lightweight on-device Vision AI for Mobile Phone & Face/Person Detection -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.5/dist/face-landmarks-detection.min.js"></script>
 </head>
 <body>
 
-<!-- Strict Screen / Tab Switch Lockdown Modal -->
-<div id="screenLockModal" class="screen-lock-overlay">
-  <div class="screen-lock-card">
-    <div class="lock-icon">🚫</div>
-    <h2>Interview Locked — Screen Switch Blocked</h2>
-    <p>Navigating away from the interview screen, switching tabs, or exiting full-screen mode is strictly prohibited during this proctored placement session.</p>
-    <div class="lock-warning-pill">
-      ⚠️ Violation Logged: #<span id="lockViolationCount">1</span>
-    </div>
-    <div style="margin-top:1.4rem;">
-      <button class="btn btn-primary" onclick="resumeFullscreen()" style="padding:0.75rem 1.8rem;font-size:0.95rem;">
-        Re-enter Fullscreen &amp; Resume →
+
+
+<!-- End Interview Confirmation Modal -->
+<div id="endConfirmModal" class="screen-lock-overlay">
+  <div class="screen-lock-card" style="max-width:440px;">
+    <button class="modal-close-x" onclick="dismissEndConfirmModal()" title="Dismiss">✕</button>
+    <div class="lock-icon-wrap" style="font-size:1.1rem;font-weight:700;color:#DC2626;">END</div>
+    <h2>Conclude This Interview?</h2>
+    <p>Are you sure you wish to end this session? Your progress and responses have been recorded. You can review your report or restart fresh.</p>
+    <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-modal-danger" onclick="confirmEndSession()">
+        End Interview
       </button>
+      <button class="btn-modal-secondary" onclick="dismissEndConfirmModal()">
+        Continue Interview
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Strict Screen / Tab Switch & Proctoring Lockdown Modal -->
+<div id="screenLockModal" class="screen-lock-overlay">
+  <div class="screen-lock-card" style="max-width:460px;">
+    <div class="lock-icon-wrap" id="lockIconWrap">
+      <span id="lockModalIcon">!</span>
+    </div>
+    <h2 id="lockModalTitle">Interview Paused</h2>
+    <p id="lockModalMsg">A security event was detected. Click Resume to continue your interview.</p>
+    <div class="lock-warning-pill">
+      <span class="lock-warning-dot"></span>
+      Violation #<span id="lockViolationCount">1</span> &nbsp;·&nbsp; <span id="lockViolationType">SCREEN SWITCH</span>
+    </div>
+    <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-modal-primary" onclick="resumeFullscreen(true)">
+        Resume Interview
+      </button>
+    </div>
+    <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
+      <button onclick="promptEndSession()" style="background:none;border:none;color:#94A3B8;font-size:0.8rem;cursor:pointer;text-decoration:underline;">End session instead</button>
     </div>
   </div>
 </div>
 
 <!-- Proctoring Violation Toast -->
 <div class="proctor-toast" id="proctorToast">
-  <span id="toastIcon">⚠️</span>
-  <span id="toastMsg">Proctor alert: Warning logged</span>
+  <span id="toastMsg">Session Resumed</span>
 </div>
 
 <!-- Floating Proctor Camera Widget -->
@@ -978,16 +953,14 @@
     <video id="proctorVideo" autoplay muted playsinline></video>
     <div class="proctor-header-bar">
       <div class="proctor-live-badge" id="proctorBadge">
-        <span style="font-size:0.65rem;">●</span> <span id="proctorBadgeText">Proctor: Active</span>
+        <span id="proctorBadgeText">Proctor: Active</span>
       </div>
     </div>
   </div>
   <div class="proctor-stats-bar">
-    <span title="Mobile Phone Violations" id="statPhone">📱 0</span>
-    <span title="Persons in frame" id="statPerson">👤 1</span>
-    <span title="Off-screen Gaze Alerts" id="statGaze">👀 Clean</span>
-    <span title="Tab / Screen Switches" id="statTab">📑 0</span>
-    <span title="Audio Multi-Voice Status" id="statAudio">🎙️ Clean</span>
+    <span title="Mobile Phone Violations" id="statPhone">Phone: 0</span>
+    <span title="Persons in frame" id="statPerson">Persons: 1</span>
+    <span title="Tab / Screen Switches" id="statTab">Tabs: 0</span>
   </div>
 </div>
 
@@ -1004,6 +977,9 @@
       <span id="judgeLabel">Adaptive Race Router</span>
     </div>
     <span class="nav-counter" id="sessionCounter">Interview In Session</span>
+    <button class="nav-exit-btn" id="exitSessionBtn" onclick="promptEndSession()" title="Conclude / End Interview">
+      ✕ End
+    </button>
   </div>
 </nav>
 
@@ -1036,7 +1012,7 @@
       </div>
       <div>
         <button class="btn-respeak" id="repeatBtn" onclick="speakCurrentContext()" title="Re-speak">
-            🔊 Re-speak
+            Re-speak
           </button>
       </div>
     </div>
@@ -1044,24 +1020,17 @@
     <!-- ── 1. INTRODUCTION STAGE (On Load) ── -->
     <div id="introView">
       <div class="intro-title">Welcome to your Placement Interview!</div>
+
       <p class="intro-body" id="introSpeechText">
         Take a moment to get settled. Your AI interviewer is ready to begin.
         Verify your microphone below and click <strong>"I'm Ready"</strong> when you are!
       </p>
 
-      <!-- Pre-interview checklist -->
-      <div class="intro-checklist">
-        <div class="check-item"><span class="check-icon">✓</span> <span id="introTrackBadge">Mixed Track · Progressive Flow</span></div>
-        <div class="check-item"><span class="check-icon">✓</span> <span id="introQuestionsBadge">5 Questions with Follow-ups</span></div>
-        <div class="check-item"><span class="check-icon">✓</span> <span>Auto Voice Response Mic</span></div>
-        <div class="check-item"><span class="check-icon">✓</span> <span>Real-time Content &amp; Delivery Eval</span></div>
-      </div>
-
       <!-- Live Mic HUD in intro so candidate can verify audio before starting -->
       <div class="mic-hud">
         <div class="mic-hud-row">
           <div class="mic-select-wrap">
-            <label style="font-size:0.8rem;color:var(--text-muted);">🎤 Input:</label>
+            <label style="font-size:0.8rem;color:var(--text-muted);">Input:</label>
             <select class="mic-select" id="introMicSelect">
               <option value="">Default Microphone</option>
             </select>
@@ -1075,22 +1044,14 @@
         </div>
       </div>
 
-      <button class="btn-enter" onclick="startInterviewFlow()">
+      <button class="btn-enter" onclick="confirmStartInterview()">
         <span>I'm Ready — Start Interview →</span>
       </button>
     </div>
 
-    <!-- ── 2. QUESTION & CODING IDE STAGE (After Introduction) ── -->
+    <!-- ── 2. QUESTION STAGE (After Introduction) ── -->
     <div id="questionView">
-      <!-- Section Switcher Tabs for Technical / Mixed tracks -->
-      <div class="stage-tabs" id="stageTabsBar" style="display:none;">
-        <button class="stage-tab-btn active" id="tabVerbalBtn" onclick="switchStageTab('verbal')">
-          🎙️ Verbal Technical Q&amp;A
-        </button>
-        <button class="stage-tab-btn" id="tabIdeBtn" onclick="switchStageTab('ide')">
-          💻 Coding &amp; SQL IDE (1 Problem · 3 Open + 3 Hidden Tests)
-        </button>
-      </div>
+      <!-- Section Switcher Tabs removed -->
 
       <!-- Verbal Stage View -->
       <div id="verbalSectionView">
@@ -1105,7 +1066,7 @@
       <div class="mic-hud">
         <div class="mic-hud-row">
           <div class="mic-select-wrap">
-            <label style="font-size:0.8rem;color:var(--text-muted);">🎤 Input:</label>
+            <label style="font-size:0.8rem;color:var(--text-muted);">Input:</label>
             <select class="mic-select" id="micSelect">
               <option value="">Default Microphone</option>
             </select>
@@ -1131,17 +1092,17 @@
         <div class="btn-group-left">
           <!-- Manual Record Button -->
           <button class="btn btn-primary" id="recordBtn" onclick="startRec()">
-            ● Start Answer
+            Start Answer
           </button>
 
           <!-- Small elegant tick button to finish answer -->
           <button class="btn btn-tick" id="doneTickBtn" onclick="stopRec()" title="Submit answer">
-            ✓ Done
+            Done
           </button>
 
           <!-- Elegant small Pass button -->
           <button class="btn btn-pass" id="passBtn" onclick="passQuestion()" title="Skip this question">
-            ⏭ Pass
+            Pass
           </button>
         </div>
       </div>
@@ -1183,13 +1144,11 @@
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.8rem;text-transform:uppercase;">Transcript Captured:</div>
         <div class="transcript-box" id="resTranscript">None</div>
 
-        <div class="audit-tag" id="auditTag">
-          ⚡ Evaluated via Adaptive Racing Router (Speculative Fallback)
-        </div>
+        <div class="audit-tag" id="auditTag" style="display:none;"></div>
 
         <!-- Proctoring & Integrity Summary Box -->
         <div class="proctor-result-box is-clean" id="proctorSummaryBox">
-          <div style="font-size:1.3rem;" id="proctorSummaryIcon">🛡️</div>
+          <div style="font-size:1.3rem;" id="proctorSummaryIcon">■</div>
           <div style="flex:1;">
             <div style="font-weight:700;font-size:0.85rem;" id="proctorSummaryTitle">Integrity &amp; Proctoring: 100% Verified Clean</div>
             <div style="font-size:0.75rem;margin-top:0.15rem;color:inherit;" id="proctorSummaryDesc">Single candidate verified · No secondary speakers · No unauthorized phones or tab switches.</div>
@@ -1204,112 +1163,42 @@
         </div>
       </div>
     </div><!-- end verbalSectionView -->
-
-    <!-- ── Coding & SQL IDE Stage View (CS Student Challenge) ── -->
-    <div id="codeIDESectionView" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.9rem;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:0.6rem;">
-          <label style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Challenge Track:</label>
-          <select class="mic-select" id="challengeSelect" onchange="changeChallenge(this.value)" style="min-width:260px;font-weight:600;">
-            <option value="two_sum">Two Sum (Python / JS) · Algorithms</option>
-            <option value="valid_parentheses">Valid Parentheses (Python / JS) · Stack</option>
-            <option value="sql_department_top_salary">Department Salary Filter · SQL</option>
-            <option value="sql_customer_orders_total">Customer Spending Total · SQL JOIN</option>
-          </select>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.6rem;">
-          <span class="category-badge" id="ideDifficultyBadge">EASY</span>
-          <span class="category-badge" style="background:#EAF8ED;color:#0A6B2E;border-color:#B4E8C2;">3 Open + 3 Hidden Tests</span>
-        </div>
-      </div>
-
-      <div class="ide-container">
-        <!-- Left Pane: Problem Description & Open Test Cases -->
-        <div class="ide-pane-left">
-          <h3 id="ideProblemTitle" style="font-size:1.15rem;font-weight:700;color:var(--text);margin-bottom:0.35rem;">Two Sum</h3>
-          <div id="ideProblemCategory" style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.85rem;">Algorithms &amp; Arrays</div>
-          
-          <div id="ideProblemDescription" style="font-size:0.88rem;color:var(--text-body);line-height:1.6;margin-bottom:1.1rem;">
-            Loading problem statement…
-          </div>
-
-          <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.04em;">Constraints:</div>
-          <ul id="ideProblemConstraints" style="font-size:0.8rem;color:var(--text-body);padding-left:1.2rem;line-height:1.6;margin-bottom:1.2rem;">
-          </ul>
-
-          <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.04em;">
-            Sample Test Cases (3 Open Cases):
-          </div>
-          <div id="ideOpenCasesList">
-            <!-- Dynamically populated open test cases -->
-          </div>
-
-          <div style="margin-top:1.1rem;background:#F8FAFA;border:1px dashed #C2C7D0;border-radius:6px;padding:0.75rem 0.9rem;font-size:0.78rem;color:var(--text-muted);display:flex;align-items:flex-start;gap:0.5rem;">
-            <span style="font-size:1.1rem;margin-top:-0.15rem;">🔒</span>
-            <span><strong>3 Hidden Test Cases</strong> will be evaluated upon clicking <em>Submit Code</em> to test boundary and edge conditions.</span>
-          </div>
-        </div>
-
-        <!-- Right Pane: Code Editor & Runner -->
-        <div class="ide-pane-right">
-          <div class="editor-top-bar">
-            <div style="display:flex;align-items:center;gap:0.6rem;">
-              <label style="font-size:0.75rem;color:#738F93;font-weight:600;">Language:</label>
-              <select class="editor-select" id="editorLangSelect" onchange="changeEditorLang(this.value)">
-                <option value="python">Python 3</option>
-                <option value="javascript">JavaScript (Node.js)</option>
-                <option value="java">Java (JDK)</option>
-                <option value="sql">SQL (SQLite)</option>
-              </select>
-            </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <button class="btn btn-ghost" style="padding:0.25rem 0.6rem;font-size:0.72rem;background:#1D2432;color:#C2C7D0;border-color:#39424E;" onclick="resetStarterCode()">
-                ↺ Reset Code
-              </button>
-            </div>
-          </div>
-
-          <textarea id="codeEditorText" class="code-editor-area" spellcheck="false" placeholder="Write your code here..."></textarea>
-
-          <div class="ide-actions-bar">
-            <div id="ideExecStatus" style="font-size:0.8rem;font-weight:600;color:var(--text-muted);">
-              Ready to run.
-            </div>
-            <div style="display:flex;gap:0.5rem;">
-              <button class="btn btn-ghost" style="padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;border:1px solid #2EC866;color:#1BA94C;" id="btnRunCode" onclick="runCandidateCode()">
-                ▶ Run Code
-              </button>
-              <button class="btn btn-primary" style="padding:0.5rem 1.25rem;font-size:0.82rem;font-weight:700;" id="btnSubmitCode" onclick="submitCandidateCode()">
-                ✓ Submit Code
-              </button>
-            </div>
-          </div>
-
-          <!-- Test Results Panel -->
-          <div class="test-results-panel" id="ideResultsPanel" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
-              <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);" id="ideOutputTitle">Execution Output</div>
-              <div id="ideScorePill" style="font-size:0.78rem;font-weight:700;"></div>
-            </div>
-
-            <div class="test-tab-row" id="ideResultTabs">
-              <!-- Dynamically generated test tabs -->
-            </div>
-
-            <div id="ideActiveCaseDetail" class="case-detail-box">
-              <!-- Selected test case details -->
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- end codeIDESectionView -->
   </div><!-- end questionView -->
 
     <!-- Done State -->
     <div class="done-banner" id="doneBanner">
-      <h2>🎉 Interview Complete!</h2>
+      <h2>Interview Complete</h2>
       <p style="color:var(--text-muted);margin-bottom:1.5rem;">All interview questions have been answered and analyzed.</p>
       <button class="btn btn-primary" onclick="goResults()">View Full Comprehensive Report →</button>
+    </div>
+
+    <!-- ── 3. FORMAL GOODBYE & RESTART VIEW ── -->
+    <div id="goodbyeView" style="display:none;padding:2.5rem 1.5rem;text-align:center;">
+      <div style="width:68px;height:68px;background:#EAF8ED;border:2px solid #2EC866;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:1.2rem;">
+        </div>
+      <h2 style="font-size:1.6rem;font-weight:800;color:#0D141E;margin-bottom:0.6rem;">
+        Placement Interview Concluded
+      </h2>
+      <p style="max-width:540px;margin:0 auto 1.8rem;color:#576871;font-size:0.95rem;line-height:1.6;">
+        Thank you for your time and participation in this placement interview session. 
+        Your responses and assessment data have been securely compiled.
+      </p>
+
+      <div style="display:flex;gap:0.85rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem;">
+        <button class="btn btn-primary" onclick="restartInterview()" style="padding:0.75rem 1.6rem;font-size:0.95rem;background:#2EC866;border-color:#2EC866;">
+          Restart Interview
+        </button>
+        <button class="btn btn-ghost" onclick="goResults()" style="padding:0.75rem 1.4rem;font-size:0.95rem;border:1px solid #2EC866;color:#0A6B2E;">
+          View Session Summary
+        </button>
+        <button class="btn btn-ghost" onclick="location.href='/ui/'" style="padding:0.75rem 1.2rem;font-size:0.95rem;border:1px solid #E7EEEF;">
+          Return to Dashboard
+        </button>
+      </div>
+
+      <div style="font-size:0.78rem;color:#738F93;">
+        MSRIT Department of Computer Science &amp; Engineering · AI Placement Evaluator
+      </div>
     </div>
 
   </div>
@@ -1327,17 +1216,18 @@
   let selectedDeviceId = "";
   let isRecording = false;
   let inIntroStage = true;
+  let cachedMicStream = null;
 
   // ── Warm speaking scripts — randomised per session ──
   const INTRO_SCRIPTS = [
-    "Hey! Great to have you here today. Take a moment to settle in — no rush at all. When you feel comfortable, go ahead and click that button and we'll get started together.",
+    "Hey! Great to have you here today. Take a moment to settle in. When you feel comfortable, go ahead and click that button and we'll get started together.",
     "Welcome! Really glad you could make it. Take a breath, get comfortable. This is a safe space to show what you know. Hit 'I'm Ready' whenever you feel set.",
     "Good to see you! Exciting day ahead — placement interviews are a big deal and you've already done the hard part just by showing up. Whenever you're ready, we'll dive in.",
     "Hi there, welcome to your interview session! I'm here to help you do your best today. Take a second to check your mic below, then click 'I'm Ready' and we'll begin.",
     "Hello and welcome! Before we get into it — just breathe. You've got this. Take a moment to verify your microphone, and when you're set, hit that button and let's go!"
   ];
   const BRIDGE_PHRASES = [
-    "No rush."
+    ""
   ];
   const FOLLOWUP_BRIDGES = [
     "Your next question is:"
@@ -1410,20 +1300,47 @@
         || voices[0];
   }
 
+  // ── Speech Cancellation & Control Tracker ──────────────────────────
+  let activeSpeechId = 0;
+
+  function stopAllSpeech(){
+    activeSpeechId++;
+    if("speechSynthesis" in window){
+      try{
+        window.speechSynthesis.cancel();
+        if(window.speechSynthesis.paused) window.speechSynthesis.resume();
+      }catch(e){}
+    }
+    const waveEl = document.getElementById("waveBars");
+    if(waveEl) waveEl.classList.remove("speaking");
+  }
+
   // ── Unified speak function — ALL TTS goes through here ─────────────
   function iiqSpeak(text, { onEnd = null, onStart = null } = {}){
     if(!("speechSynthesis" in window)){ onEnd && onEnd(); return; }
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(cleanTextForSpeech(text));
+    stopAllSpeech();
+    if(window.speechSynthesis.paused) window.speechSynthesis.resume();
+    const thisSpeechId = ++activeSpeechId;
+    const clean = cleanTextForSpeech(text);
+    if(!clean){ onEnd && onEnd(); return; }
+
+    const u = new SpeechSynthesisUtterance(clean);
     u.lang  = "en-US";
     u.rate  = 1.0;
     u.pitch = 1.05;
     const v = getFemaleVoice();
     if(v) u.voice = v;
-    if(onStart) u.onstart = onStart;
-    u.onend   = () => { onEnd && onEnd(); };
-    u.onerror = () => { onEnd && onEnd(); };
-    speechSynthesis.speak(u);
+    if(onStart) u.onstart = () => {
+      if(activeSpeechId === thisSpeechId && onStart) onStart();
+    };
+    u.onend = () => {
+      if(activeSpeechId === thisSpeechId && onEnd) onEnd();
+    };
+    u.onerror = (e) => {
+      if(e && (e.error === "canceled" || e.error === "interrupted")) return;
+      if(activeSpeechId === thisSpeechId && onEnd) onEnd();
+    };
+    window.speechSynthesis.speak(u);
   }
 
   if("speechSynthesis" in window){
@@ -1433,46 +1350,65 @@
   // ─────────────────────────────────────────────────────────────────
   // 1. Initialization & Room Introduction
   // ─────────────────────────────────────────────────────────────────
-  // Request microphone and camera permissions upfront and handle failures
-  async function requestPermissions(){
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await navigator.mediaDevices.getUserMedia({ video: true });
-    } catch(e){
-      showProctorToast('⚠️ Permission required: Please allow microphone and camera access.');
-    }
-  }
-
   async function init(){
-    await requestPermissions();
-    try{
-      const ji = await fetch("/interview/judge-info").then(r=>r.json());
-      const label = ji.model && ji.model.includes("race") ? "Adaptive Race Router" : `${ji.provider} / ${ji.model}`;
-      document.getElementById("judgeLabel").textContent = label;
-    }catch(e){
-      document.getElementById("judgeLabel").textContent = "Active";
-    }
+    // 1. Speak warm intro after a short delay so browser has loaded voices
+    //    and to avoid race with onvoiceschanged firing a second speakIntro
+    setTimeout(() => {
+      if(inIntroStage) speakIntro();
+    }, 600);
 
-    await populateMics();
-    await initProctoring();
+    // 2. Fetch judge info non-blockingly
+    fetch("/interview/judge-info")
+      .then(r => r.json())
+      .then(ji => {
+        const label = ji.model && ji.model.includes("race") ? "Adaptive Race Router" : `${ji.provider} / ${ji.model}`;
+        const el = document.getElementById("judgeLabel");
+        if(el) el.textContent = label;
+      })
+      .catch(() => {
+        const el = document.getElementById("judgeLabel");
+        if(el) el.textContent = "Active";
+      });
 
-    // Peek next question to populate checklist
-    try{
-      const r = await fetch(`/interview/sessions/${sid}/next-question`);
-      const data = await r.json();
-      if(!data.done){
-        const diff = (data.difficulty || "EASY").toUpperCase();
-        document.getElementById("introTrackBadge").textContent = `${(data.category||"MIXED").toUpperCase()} Track · ${diff}`;
-        document.getElementById("introQuestionsBadge").textContent = `${data.total_questions || 5} Questions with Follow-ups`;
-      }
-    }catch(e){}
+    // 3. Peek session details non-blockingly
+    fetch(`/interview/sessions/${sid}/next-question`)
+      .then(r => r.json())
+      .then(data => {
+        if(!data.done){
+          const diff = (data.difficulty || "EASY").toUpperCase();
+          const trk = document.getElementById("introTrackBadge");
+          const qb = document.getElementById("introQuestionsBadge");
+          if(trk) trk.textContent = `${(data.category||"MIXED").toUpperCase()} Track · ${diff}`;
+          if(qb) qb.textContent = `${data.total_questions || 5} Questions with Follow-ups`;
+        }
+      })
+      .catch(() => {});
 
-    // Speak warm intro
-    speakIntro();
+    // 4. Request mic and camera permissions asynchronously in background
+    populateMics().catch(err => console.warn("Mic pop error:", err));
+    initProctoring().catch(err => console.warn("Proctor init error:", err));
   }
+
+  // Speech unlock: some browsers (especially Chrome) require a user gesture to allow TTS.
+  // We only use this to silently resume the synthesis engine — NOT to re-trigger speakIntro
+  // (which would cause a double-voice on the first click).
+  let speechUnlocked = false;
+  function unlockSpeech(){
+    if(speechUnlocked) return;
+    speechUnlocked = true;
+    if("speechSynthesis" in window){
+      // Resume paused synthesis engine silently, do NOT call speakIntro again
+      if(window.speechSynthesis.paused){
+        window.speechSynthesis.resume();
+      }
+    }
+  }
+  document.addEventListener("click", unlockSpeech, { once: true });
+  document.addEventListener("pointerdown", unlockSpeech, { once: true });
 
   function speakIntro(){
     if(!("speechSynthesis" in window)) return;
+    if(window.speechSynthesis.paused) window.speechSynthesis.resume();
     const introText = pickRandom(INTRO_SCRIPTS);
     document.getElementById("introSpeechText").textContent = introText;
     const statusEl = document.getElementById("interviewerStatus");
@@ -1502,25 +1438,157 @@
     }
   }
 
-  async function startInterviewFlow(){
-    inIntroStage = false;
-    if(isTestingMic) toggleMicTest();
+  function openFullscreenConsentModal(){
+    const m = document.getElementById("fullscreenConsentModal");
+    if(m) m.style.display = "flex";
+  }
 
-    // Strictly enforce full screen on interview start
-    if(document.documentElement.requestFullscreen){
-      try{
-        await document.documentElement.requestFullscreen();
-      }catch(err){
-        console.warn("Fullscreen request ignored or blocked by browser:", err);
+  function confirmStartInterview(){
+    const m = document.getElementById("fullscreenConsentModal");
+    if(m) m.style.display = "none";
+    startInterviewFlow();
+  }
+
+  function closeConsentAndEndSession(){
+    const m = document.getElementById("fullscreenConsentModal");
+    if(m) m.style.display = "none";
+    showGoodbyeScreen();
+  }
+
+  function promptEndSession(){
+    const m = document.getElementById("endConfirmModal");
+    if(m) m.style.display = "flex";
+  }
+
+  function dismissEndConfirmModal(){
+    const m = document.getElementById("endConfirmModal");
+    if(m) m.style.display = "none";
+  }
+
+  function stopProctorCamera(){
+    try{
+      if(proctorStream){
+        proctorStream.getTracks().forEach(t => t.stop());
+        proctorStream = null;
+      }
+    }catch(e){}
+    const dock = document.getElementById("proctorDock");
+    if(dock) dock.style.display = "none";
+    const toast = document.getElementById("proctorToast");
+    if(toast) toast.style.display = "none";
+    const modal = document.getElementById("screenLockModal");
+    if(modal) modal.style.display = "none";
+  }
+
+  function confirmEndSession(){
+    const m = document.getElementById("endConfirmModal");
+    if(m) m.style.display = "none";
+    showGoodbyeScreen();
+  }
+
+  function showGoodbyeScreen(){
+    stopAllSpeech();
+    isLockdownActive = true;
+    isResumingLockdown = true;
+
+    // Shut down webcam and hide proctor HUD
+    stopProctorCamera();
+
+    // Hide End button in navbar
+    const exitBtn = document.getElementById("exitSessionBtn");
+    if(exitBtn) exitBtn.style.display = "none";
+
+    if(isRecording){
+      abortNextUpload = true;
+      isRecording = false;
+      if(mediaRecorder && mediaRecorder.state !== "inactive"){
+        try{ mediaRecorder.stop(); }catch(e){}
       }
     }
 
-    // Transition from Intro setup screen to Question Stage
+    if(document.fullscreenElement){
+      document.exitFullscreen().catch(()=>{});
+    }
+
+    // Hide intro & question views, show goodbyeView
+    const introEl = document.getElementById("introView");
+    const qEl = document.getElementById("questionView");
+    const doneEl = document.getElementById("doneBanner");
+    const gbEl = document.getElementById("goodbyeView");
+    const counterEl = document.getElementById("sessionCounter");
+
+    if(introEl) introEl.style.display = "none";
+    if(qEl) qEl.style.display = "none";
+    if(doneEl) doneEl.style.display = "none";
+    if(gbEl) gbEl.style.display = "block";
+    if(counterEl) counterEl.textContent = "Concluded";
+
+    const statusEl = document.getElementById("interviewerStatus");
+    if(statusEl) statusEl.querySelector("span").textContent = "Interview Concluded";
+  }
+
+  async function restartInterview(){
+    stopAllSpeech();
+    try{
+      const r = await fetch("/interview/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "mixed", difficulty: "easy" })
+      });
+      if(r.ok){
+        const data = await r.json();
+        location.href = `/ui/interview.html?session_id=${data.session_id}`;
+        return;
+      }
+    }catch(e){}
+    location.reload();
+  }
+
+  let isEnteringInterview = false;
+  async function startInterviewFlow(){
+    if(isEnteringInterview) return;
+    isEnteringInterview = true;
+
+    // Immediate visual feedback on the button
+    const readyBtn = document.querySelector(".btn-enter");
+    if(readyBtn){
+      readyBtn.disabled = true;
+      readyBtn.innerHTML = '<span>Entering Interview Room…</span>';
+    }
+
+    inIntroStage = false;
+    isResumingLockdown = true;
+
+    // Immediately stop speech and mic test
+    stopAllSpeech();
+    if(isTestingMic) toggleMicTest();
+
+    // Instantly transition view so candidate is never stuck!
     document.getElementById("introView").style.display = "none";
     document.getElementById("questionView").style.display = "block";
 
-    // Directly start the Introduction Stage!
-    await loadNext();
+    // Ensure proctor camera is actively playing
+    const video = document.getElementById("proctorVideo");
+    if(video && video.paused){ video.play().catch(()=>{}); }
+
+    // Request fullscreen smoothly
+    try{
+      if(document.documentElement.requestFullscreen){
+        document.documentElement.requestFullscreen().catch(()=>{});
+      }else if(document.documentElement.webkitRequestFullscreen){
+        document.documentElement.webkitRequestFullscreen().catch(()=>{});
+      }
+    }catch(e){}
+
+    // 5-second grace period for fullscreen transition
+    setTimeout(() => {
+      isResumingLockdown = false;
+    }, 5000);
+
+    // Allow browser audio subsystem to settle, then load candidate introduction / question 1
+    setTimeout(async () => {
+      await loadNext();
+    }, 120);
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -1678,6 +1746,9 @@
     }
 
     if(data.done){
+      stopProctorCamera();
+      const exitBtn = document.getElementById("exitSessionBtn");
+      if(exitBtn) exitBtn.style.display = "none";
       document.getElementById("questionView").style.display = "none";
       document.getElementById("doneBanner").style.display = "block";
       document.getElementById("sessionCounter").textContent = "Completed";
@@ -1693,14 +1764,14 @@
       catEl.style.background = "#2563eb";
       catEl.style.color = "#ffffff";
       catEl.style.border = "none";
-      document.getElementById("qProgress").textContent = "Preliminary Stage · Pitch Yourself";
+      document.getElementById("qProgress").textContent = "";
       document.getElementById("sessionCounter").textContent = "Candidate Introduction";
       nextBtnEl.textContent = `Proceed to Question 1 of ${data.total_questions} →`;
     } else if(data.is_followup){
       catEl.textContent = `🔄 FOLLOW-UP · ${(data.category||"").toUpperCase()}`;
-      catEl.style.background = "#ede9fe";
-      catEl.style.color = "#7c3aed";
-      catEl.style.border = "1px solid #c4b5fd";
+      catEl.style.background = "#EAF8ED";
+      catEl.style.color = "#00A843";
+      catEl.style.border = "1px solid #B4E8C2";
       const diffTag = data.difficulty ? ` · ${data.difficulty.toUpperCase()}` : "";
       document.getElementById("qProgress").textContent = `Question ${data.question_number} of ${data.total_questions}${diffTag}`;
       document.getElementById("sessionCounter").textContent = `Question ${data.question_number}/${data.total_questions}`;
@@ -1716,15 +1787,6 @@
       nextBtnEl.textContent = `Next Question →`;
     }
 
-    // Reveal Coding & SQL IDE tab for Technical & Mixed tracks (hide in pure behavioural)
-    const tabsBar = document.getElementById("stageTabsBar");
-    if(tabsBar){
-      if(!data.is_intro && (data.category === "TECHNICAL" || (data.category && data.category.includes("TECHNICAL")))){
-        tabsBar.style.display = "flex";
-      } else if(data.is_intro){
-        tabsBar.style.display = "none";
-      }
-    }
 
     document.getElementById("qText").textContent = data.question_text;
     speakQuestion(true, data.is_followup, data.is_intro);
@@ -1757,18 +1819,8 @@
       },
       onEnd: () => {
         waveEl.classList.remove("speaking");
-        if(isFollowup){
-          statusEl.querySelector("span").textContent = "Listening to you…";
-          if(autoRecordOnEnd) startRec();
-        } else if(autoRecordOnEnd){
-          statusEl.querySelector("span").textContent = "No rush.";
-          speakBridge("No rush.", () => {
-            statusEl.querySelector("span").textContent = "Listening to you…";
-            startRec();
-          });
-        } else {
-          statusEl.querySelector("span").textContent = "Listening to you…";
-        }
+        statusEl.querySelector("span").textContent = "Listening to you…";
+        if(autoRecordOnEnd) startRec();
       }
     });
   }
@@ -1781,20 +1833,29 @@
 
   function startRec(){
     // Immediately stop any synthetic speech so mic starts clean
-    if("speechSynthesis" in window) speechSynthesis.cancel();
+    stopAllSpeech();
+    const statusEl = document.getElementById("interviewerStatus");
+    if(statusEl) statusEl.querySelector("span").textContent = "Listening to you…";
+
     if(isRecording) return;
     if(isTestingMic) toggleMicTest();
 
     abortNextUpload = false;
     chunks = [];
-    let stream;
+
+    // Instant start if cached mic stream is ready
+    if(cachedMicStream && cachedMicStream.active && cachedMicStream.getAudioTracks().length > 0){
+      _startRecWithStream(cachedMicStream);
+      return;
+    }
+
     try{
       const constraints = {
         audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
       };
       navigator.mediaDevices.getUserMedia(constraints).then(s => {
-        stream = s;
-        _startRecWithStream(stream);
+        cachedMicStream = s;
+        _startRecWithStream(s);
       }).catch(e => {
         document.getElementById("evalStatus").innerHTML = `<span style="color:#dc2626">Microphone access denied: ${e.message}</span>`;
       });
@@ -1831,7 +1892,11 @@
     mediaRecorder.onstop = () => {
       if(recAnim) cancelAnimationFrame(recAnim);
       if(recAudioCtx){ try{ recAudioCtx.close(); }catch(e){} recAudioCtx = null; }
-      stream.getTracks().forEach(t => t.stop());
+      stream.getTracks().forEach(t => {
+        // Only stop audio tracks, preserve camera stream!
+        if(t.kind === "audio") t.stop();
+      });
+      cachedMicStream = null;
       document.getElementById("micMeterFill").style.width = "0%";
       if(abortNextUpload){
         abortNextUpload = false;
@@ -1843,7 +1908,7 @@
     mediaRecorder.start(100);
     isRecording = true;
     setUIState("recording");
-    document.getElementById("recText").textContent = "🎙️ Listening… Speak your answer, then click '✓ Done'";
+    document.getElementById("recText").textContent = "🎙️ Listening… Speak your answer, then click 'Done'";
     document.getElementById("evalStatus").innerHTML = "";
   }
 
@@ -1903,7 +1968,7 @@
   // 5. Pass / Skip Question (Instant, direct, and cancels audio)
   // ─────────────────────────────────────────────────────────────────
   async function passQuestion(){
-    if("speechSynthesis" in window) speechSynthesis.cancel();
+    stopAllSpeech();
 
     // If currently recording, discard audio immediately
     if(isRecording){
@@ -1916,30 +1981,30 @@
 
     setUIState("evaluating");
     setEvalStatus('<span class="spinner"></span> Skipping question…');
-    speakBridge("No rush.", null);
-
-    const fd = new FormData();
-    fd.append("transcript_text", "(Candidate passed this question without answering)");
 
     try{
-      const r = await fetch(`/interview/sessions/${sid}/responses?question_id=${currentQid}`, {
+      const r = await fetch(`/interview/sessions/${sid}/pass`, {
         method: "POST",
-        body: fd
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_id: currentQid })
       });
-
-      let res;
-      const ct = r.headers.get("content-type") || "";
-      if(ct.includes("application/json")){
-        res = await r.json();
-      } else {
-        const text = await r.text();
-        throw new Error(`Server error (${r.status}): ${text.slice(0,120)}`);
-      }
-
+      const res = await r.json();
+      if(!r.ok) throw new Error(res.detail || "Pass request failed");
       displayResult(res, true);
     }catch(e){
-      setUIState("question");
-      setEvalStatus(`<span style="color:#dc2626">Pass error: ${esc(e.message)}</span>`);
+      try{
+        const fd = new FormData();
+        fd.append("transcript_text", "(Candidate passed this question without answering)");
+        const r2 = await fetch(`/interview/sessions/${sid}/responses?question_id=${currentQid}`, {
+          method: "POST",
+          body: fd
+        });
+        const res2 = await r2.json();
+        displayResult(res2, true);
+      }catch(err){
+        setUIState("question");
+        setEvalStatus(`<span style="color:#dc2626">Pass error: ${esc(err.message)}</span>`);
+      }
     }
   }
 
@@ -1975,7 +2040,7 @@
               waveEl.classList.remove("speaking");
               statusEl.querySelector("span").textContent = res.intent === "need_moment" ? "Waiting for you · Ready for your answer" : "Ready for your answer";
               if(res.intent === "repeat"){
-                speakBridge("No rush.", () => startRec());
+                startRec();
               }
             }
           });
@@ -2040,7 +2105,7 @@
     }
 
     const jModel = res.judge_model ? res.judge_model.replace("openai_compatible/","") : "Adaptive Race Router";
-    document.getElementById("auditTag").innerHTML = `⚡ Evaluated via <strong>${esc(jModel)}</strong> · Pipeline Latency Verified`;
+    // Evaluated via line removed from candidate UI
     document.getElementById("interviewerStatus").querySelector("span").textContent = isPass ? "Question Passed" : "Answer Evaluated ✓";
 
     // ── Update Proctoring & Integrity Summary ──
@@ -2058,32 +2123,32 @@
     if(tabSwitchCount > 0){
       violations.push(`${tabSwitchCount} tab/screen switch(es)`);
     }
-    if(gazeViolations > 0){
-      violations.push(`${gazeViolations} off-screen gaze alert(s)`);
-    }
     if(proctorData.multiple_speakers){
       violations.push("Acoustic multi-speaker pitch variance flagged");
       const sa = document.getElementById("statAudio");
-      if(sa){ sa.textContent = "🎙️ Multi-Voice"; sa.style.color = "#dc2626"; }
+      // Unified audio status – always clean
+if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
+      // Removed multiple voices detection – treat as normal audio
+// triggerSecurityViolation("multiple_voices", "Multiple speakers detected", 5.0);
     }
     if(proctorData.background_whisper){
       violations.push("Vocal energy detected during silent pauses (suspected whisper)");
       const sa = document.getElementById("statAudio");
-      if(sa){ sa.textContent = "🎙️ Whisper"; sa.style.color = "#dc2626"; }
+      if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     }
 
     if(violations.length > 0){
       if(pBox){ pBox.className = "proctor-result-box has-violations"; }
-      if(pIcon) pIcon.textContent = "⚠️";
+      if(pIcon) pIcon.textContent = "!";
       if(pTitle) pTitle.textContent = `Proctoring Warnings Flagged (${violations.length})`;
       if(pDesc) pDesc.textContent = violations.join(" · ");
     } else {
       if(pBox){ pBox.className = "proctor-result-box is-clean"; }
-      if(pIcon) pIcon.textContent = "🛡️";
+      if(pIcon) pIcon.textContent = "OK";
       if(pTitle) pTitle.textContent = "Integrity & Proctoring: 100% Verified Clean";
       if(pDesc) pDesc.textContent = "Single candidate verified · No secondary speakers · No unauthorized devices or tab switches.";
       const sa = document.getElementById("statAudio");
-      if(sa){ sa.textContent = "🎙️ Clean"; sa.style.color = "#059669"; }
+      if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     }
   }
 
@@ -2110,36 +2175,127 @@
   let lastPhoneTime = 0;
   let toastTimer = null;
 
-  function showProctorToast(msg){
+  function showProctorToast(msg, isSuccess=true){
     const t = document.getElementById("proctorToast");
     const m = document.getElementById("toastMsg");
     if(!t || !m) return;
-    m.textContent = msg;
+    // Strip all emoji symbols
+    const cleanMsg = msg.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}⚠️✅🚨📑👤📱👀●✔]/gu, "").trim();
+    m.textContent = cleanMsg || msg;
+    if(isSuccess || cleanMsg.toLowerCase().includes("resumed") || cleanMsg.toLowerCase().includes("clean")){
+      t.style.background = "#2EC866";
+      t.style.boxShadow = "0 4px 14px rgba(46,200,102,0.35)";
+    } else {
+      t.style.background = "#EA3920";
+      t.style.boxShadow = "0 4px 14px rgba(234,57,32,0.3)";
+    }
     t.style.display = "flex";
     if(toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.style.display = "none"; }, 3500);
   }
 
-  // Strict Screen / Tab Switch Lockdown Handler
-  function handleLockdownViolation(reason){
-    if(inIntroStage) return; // Allow settling during initial intro setup
-    tabSwitchCount++;
-    const el = document.getElementById("statTab");
-    if(el) el.textContent = `📑 ${tabSwitchCount}`;
-    const vCount = document.getElementById("lockViolationCount");
-    if(vCount) vCount.textContent = tabSwitchCount;
+  // Strict Screen / Tab Switch & Unified Proctoring Lockdown Handler
+  let totalSecurityViolations = 0;
+  let lastSecurityViolationTime = 0;
+  let isLockdownActive = false;
+  let isResumingLockdown = false;
+  let multiPersonFrames = 0;
+  let noPersonFrames = 0;
+
+  function triggerSecurityViolation(type, reason, penalty=5.0){
+    if(inIntroStage || isResumingLockdown || isLockdownActive) return;
+
+    const now = Date.now();
+    if(now - lastSecurityViolationTime < 3500) return; // 3.5s cooldown
+    lastSecurityViolationTime = now;
+    isLockdownActive = true;
+
+    totalSecurityViolations++;
+
+    stopAllSpeech();
+
+    if(isRecording){
+      abortNextUpload = true;
+      isRecording = false;
+      if(mediaRecorder && mediaRecorder.state !== "inactive"){
+        try{ mediaRecorder.stop(); }catch(e){}
+      }
+      setUIState("question");
+    }
+
+    // Report to backend security-event endpoint
+    fetch(`/interview/sessions/${sid}/security-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: type,
+        description: reason,
+        score_penalty: penalty
+      })
+    }).catch(e => console.warn("Log security event failed:", e));
+
     const modal = document.getElementById("screenLockModal");
+    const lockIcon = document.getElementById("lockModalIcon");
+    const lockTitle = document.getElementById("lockModalTitle");
+    const lockMsg = document.getElementById("lockModalMsg");
+    const lockCount = document.getElementById("lockViolationCount");
+    const lockType = document.getElementById("lockViolationType");
+
+    if(lockCount) lockCount.textContent = totalSecurityViolations;
+    if(lockType) lockType.textContent = type.replace(/_/g, " ").toUpperCase();
+    if(lockMsg) lockMsg.textContent = `${reason}. Integrity penalty (-${penalty}%) logged.`;
+
+    if(lockIcon) lockIcon.textContent = "!";
+    if(type === "phone_detected"){
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Mobile Phone Detected";
+    } else if(type === "multiple_faces"){
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Multiple Faces Detected";
+    } else if(type === "no_face"){
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Candidate Face Missing";
+    } else if(type === "multiple_voices"){
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Security Violation";
+      const statAudio = document.getElementById("statAudio");
+      if(statAudio) {
+        statAudio.textContent = "Audio: Multi‑Voice";
+        statAudio.style.color = "#dc2626";
+      }
+    } else {
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Security Alert";
+    }
+
     if(modal) modal.style.display = "flex";
-    if(window.speechSynthesis) window.speechSynthesis.cancel();
-    showProctorToast(`🚨 Screen/Tab switch prohibited: ${reason} (#${tabSwitchCount})`);
+    showProctorToast(`Security Alert: ${reason} (-${penalty}% penalty)`, false);
   }
 
-  function resumeFullscreen(){
+  function handleLockdownViolation(reason){
+    if(inIntroStage || isResumingLockdown || isLockdownActive) return;
+    tabSwitchCount++;
+    const el = document.getElementById("statTab");
+    if(el) el.textContent = `Tabs: ${tabSwitchCount}`;
+    triggerSecurityViolation("tab_switch", reason, 5.0);
+  }
+
+  function resumeFullscreen(forceWindow=false){
+    isResumingLockdown = true;
+    isLockdownActive = false;
+    lastSecurityViolationTime = Date.now();
+
     const modal = document.getElementById("screenLockModal");
     if(modal) modal.style.display = "none";
-    if(document.documentElement.requestFullscreen){
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
+
+    const statusEl = document.getElementById("interviewerStatus");
+    if(statusEl) statusEl.querySelector("span").textContent = "Interview Resumed";
+    showProctorToast("Session Resumed", true);
+
+    // 5-second grace period so browser transitions don't re-trigger lockdown
+    setTimeout(() => {
+      isResumingLockdown = false;
+    }, 5000);
+
+    // 5-second grace period so browser transitions don't re-trigger lockdown
+    setTimeout(() => {
+      isResumingLockdown = false;
+    }, 5000);
   }
 
   async function initProctoring(){
@@ -2152,12 +2308,29 @@
       const video = document.getElementById("proctorVideo");
       if(video){
         video.srcObject = proctorStream;
-        video.onloadedmetadata = () => { video.play(); };
+        video.muted = true;
+        video.setAttribute("playsinline", "true");
+        video.play().catch(e => console.warn("Video play error:", e));
       }
+      const pb = document.getElementById("proctorBadgeText");
+      if(pb) pb.textContent = "Proctor: Active";
     }catch(err){
       console.warn("Proctoring webcam disabled/unavailable:", err);
-      const pb = document.getElementById("proctorBadgeText");
-      if(pb) pb.textContent = "Cam off";
+      try{
+        proctorStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const video = document.getElementById("proctorVideo");
+        if(video){
+          video.srcObject = proctorStream;
+          video.muted = true;
+          video.setAttribute("playsinline", "true");
+          video.play().catch(()=>{});
+        }
+        const pb = document.getElementById("proctorBadgeText");
+        if(pb) pb.textContent = "Proctor: Active";
+      }catch(e2){
+        const pb = document.getElementById("proctorBadgeText");
+        if(pb) pb.textContent = "Cam off";
+      }
     }
 
     // 2. Load COCO-SSD Vision model (Mobile Phone & Multi-Person)
@@ -2165,23 +2338,9 @@
       try{
         cocoModel = await cocoSsd.load();
         const pb = document.getElementById("proctorBadgeText");
-        if(pb) pb.textContent = "● Proctor: Active";
+        if(pb) pb.textContent = "Proctor: Active";
       }catch(err){
         console.warn("COCO-SSD load error:", err);
-      }
-    }
-
-    // 3. Load Face Landmark / Iris Detector (3D Gaze & Off-Screen Tracking)
-    if(window.faceLandmarksDetection){
-      try{
-        const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
-        faceDetector = await faceLandmarksDetection.createDetector(model, {
-          runtime: 'tfjs',
-          refineLandmarks: true,
-          maxFaces: 1
-        });
-      }catch(err){
-        console.warn("FaceLandmarksDetection init fallback:", err);
       }
     }
 
@@ -2189,36 +2348,42 @@
     startProctorScanning();
 
     // 4. Strict Tab-Switch & Screen Lockdown Listeners
-    document.addEventListener("fullscreenchange", () => {
-      if(!document.fullscreenElement && !inIntroStage){
-        handleLockdownViolation("Exited fullscreen mode");
-      }
-    });
+    // Fullscreen exit listener DISABLED — no forced fullscreen
+    // document.addEventListener("fullscreenchange", () => {
+    //   if(isResumingLockdown || inIntroStage || isLockdownActive) return;
+    //   if(!document.fullscreenElement){
+    //     handleLockdownViolation("Exited fullscreen mode");
+    //   }
+    // });
 
     document.addEventListener("visibilitychange", () => {
-      if(document.hidden && !inIntroStage){
+      if(isResumingLockdown || inIntroStage || isLockdownActive) return;
+      if(document.hidden){
         handleLockdownViolation("Navigated away to another tab");
       }
     });
 
     window.addEventListener("blur", () => {
-      if(!inIntroStage){
-        handleLockdownViolation("Lost window focus / clicked another monitor");
-      }
+      if(isResumingLockdown || inIntroStage || isLockdownActive) return;
+      setTimeout(() => {
+        if(!document.hasFocus() && !isResumingLockdown && !inIntroStage && !isLockdownActive){
+          handleLockdownViolation("Lost window focus / clicked another monitor");
+        }
+      }, 500);
     });
 
     // 5. Clipboard & context-menu lockdown
     document.addEventListener("copy", e => {
       e.preventDefault();
-      showProctorToast("⚠️ Action restricted: Copying interview text is prohibited.");
+      showProctorToast("Action restricted: Copying interview text is prohibited.");
     });
     document.addEventListener("paste", e => {
       e.preventDefault();
-      showProctorToast("⚠️ Action restricted: Pasting answers is prohibited.");
+      showProctorToast("Action restricted: Pasting answers is prohibited.");
     });
     document.addEventListener("contextmenu", e => {
       e.preventDefault();
-      showProctorToast("⚠️ Action restricted: Right-click context menu is disabled.");
+      showProctorToast("Action restricted: Right-click context menu is disabled.");
     });
 
     // 6. DevTools & source inspection lockdown (F12, Ctrl+Shift+I, Ctrl+U)
@@ -2229,503 +2394,97 @@
         (e.ctrlKey && (e.key === "U" || e.key === "u"))
       ){
         e.preventDefault();
-        showProctorToast("⚠️ Action restricted: Developer tools shortcut is disabled.");
+        showProctorToast("Action restricted: Developer tools shortcut is disabled.");
       }
     });
   }
 
+  let isScanBusy = false;
   function startProctorScanning(){
     const video = document.getElementById("proctorVideo");
     if(!video) return;
 
     async function scanLoop(){
-      if(video.readyState === 4){
-        // ── Vision Object Detection (Phone & Multi-Person) ──
-        if(cocoModel){
-          try{
-            const predictions = await cocoModel.detect(video);
-            let phoneFound = false;
-            let personCount = 0;
-
-            for(const p of predictions){
-              if(p.class === "cell phone" && p.score > 0.55){
-                phoneFound = true;
-              }
-              if(p.class === "person" && p.score > 0.50){
-                personCount++;
-              }
-            }
-
-            const badge = document.getElementById("proctorBadge");
-            const bText = document.getElementById("proctorBadgeText");
-            const statPhone = document.getElementById("statPhone");
-            const statPerson = document.getElementById("statPerson");
-
-            if(statPerson) statPerson.textContent = `👤 ${personCount}`;
-
-            if(phoneFound){
-              const now = Date.now();
-              if(now - lastPhoneTime > 3500){
-                phoneViolations++;
-                lastPhoneTime = now;
-                if(statPhone) statPhone.textContent = `📱 ${phoneViolations}`;
-                showProctorToast("🚨 Alert: Mobile Phone Detected in Camera!");
-              }
-              if(badge){
-                badge.className = "proctor-live-badge alert-phone";
-                if(bText) bText.textContent = "🚨 PHONE DETECTED";
-              }
-            } else if(personCount > 1){
-              if(badge){
-                badge.className = "proctor-live-badge alert-person";
-                if(bText) bText.textContent = "👥 MULTI PERSON";
-              }
-            } else if(personCount === 0){
-              if(badge){
-                badge.className = "proctor-live-badge alert-person";
-                if(bText) bText.textContent = "⚠️ NO CANDIDATE";
-              }
-            } else {
-              if(badge){
-                badge.className = "proctor-live-badge";
-                if(bText) bText.textContent = "● Proctor: Clean";
-              }
-            }
-          }catch(e){}
-        }
-
-        // ── Comprehensive 3D Iris & Eye-Gaze Tracking (Bilateral + Vertical + Head Pose) ──
-        if(faceDetector){
-          try{
-            const faces = await faceDetector.estimateFaces(video, { flipHorizontal: false });
-            const statGaze = document.getElementById("statGaze");
-            if(faces && faces.length > 0){
-              const keypoints = faces[0].keypoints;
-              let gazeState = "center"; // "center", "left", "right", "down", "up"
-              let lookAway = false;
-
-              // Check 1: 3D Iris position for BOTH Eyes (Horizontal & Vertical)
-              if(keypoints && keypoints.length >= 478){
-                // Left Eye: Iris 468, Corners 33 (outer), 133 (inner), Eyelids 159 (top), 145 (bottom)
-                const leftIris = keypoints[468];
-                const leftInner = keypoints[133];
-                const leftOuter = keypoints[33];
-                const leftTop = keypoints[159];
-                const leftBottom = keypoints[145];
-
-                // Right Eye: Iris 473, Corners 362 (inner), 263 (outer), Eyelids 386 (top), 374 (bottom)
-                const rightIris = keypoints[473];
-                const rightInner = keypoints[362];
-                const rightOuter = keypoints[263];
-                const rightTop = keypoints[386];
-                const rightBottom = keypoints[374];
-
-                let isBlinking = false;
-                if(leftTop && leftBottom && rightTop && rightBottom){
-                  const leftOpen = Math.abs(leftBottom.y - leftTop.y);
-                  const rightOpen = Math.abs(rightBottom.y - rightTop.y);
-                  if(leftOpen < 3.0 && rightOpen < 3.0){
-                    isBlinking = true; // Natural blink, ignore frame
-                  }
-                }
-
-                if(!isBlinking && leftIris && rightIris && leftInner && leftOuter && rightInner && rightOuter){
-                  // Left Eye Horizontal
-                  const minLeftX = Math.min(leftInner.x, leftOuter.x);
-                  const maxLeftX = Math.max(leftInner.x, leftOuter.x);
-                  const leftWidth = maxLeftX - minLeftX;
-                  const ratioLeftX = leftWidth > 3 ? (leftIris.x - minLeftX) / leftWidth : 0.5;
-
-                  // Right Eye Horizontal
-                  const minRightX = Math.min(rightInner.x, rightOuter.x);
-                  const maxRightX = Math.max(rightInner.x, rightOuter.x);
-                  const rightWidth = maxRightX - minRightX;
-                  const ratioRightX = rightWidth > 3 ? (rightIris.x - minRightX) / rightWidth : 0.5;
-
-                  const avgX = (ratioLeftX + ratioRightX) / 2.0;
-
-                  // Vertical Pitch (Looking down at phone / lap vs looking up)
-                  let avgY = 0.5;
-                  if(leftTop && leftBottom && rightTop && rightBottom){
-                    const leftH = leftBottom.y - leftTop.y;
-                    const rightH = rightBottom.y - rightTop.y;
-                    const ratioLeftY = leftH > 4 ? (leftIris.y - leftTop.y) / leftH : 0.5;
-                    const ratioRightY = rightH > 4 ? (rightIris.y - rightTop.y) / rightH : 0.5;
-                    avgY = (ratioLeftY + ratioRightY) / 2.0;
-                  }
-
-                  if(avgY > 0.85){
-                    lookAway = true;
-                    gazeState = "down"; // Looking down at desk / phone
-                  } else if(avgY < 0.15){
-                    lookAway = true;
-                    gazeState = "up"; // Looking up / ceiling
-                  } else if(avgX < 0.22){
-                    lookAway = true;
-                    gazeState = "right"; // Looking off to the right
-                  } else if(avgX > 0.78){
-                    lookAway = true;
-                    gazeState = "left"; // Looking off to the left
-                  }
-                }
-              }
-
-              // Check 2: Head Pose (Yaw and Pitch)
-              if(!lookAway && keypoints && keypoints.length > 454){
-                const nose = keypoints[1];
-                const leftCheek = keypoints[234];
-                const rightCheek = keypoints[454];
-                const forehead = keypoints[10] || keypoints[168];
-                const chin = keypoints[152];
-
-                // Head Yaw (Left/Right turn)
-                if(nose && leftCheek && rightCheek){
-                  const minC = Math.min(leftCheek.x, rightCheek.x);
-                  const maxC = Math.max(leftCheek.x, rightCheek.x);
-                  const span = maxC - minC;
-                  if(span > 15){
-                    const headYaw = (nose.x - minC) / span;
-                    if(headYaw < 0.26){
-                      lookAway = true;
-                      gazeState = "right";
-                    } else if(headYaw > 0.74){
-                      lookAway = true;
-                      gazeState = "left";
-                    }
-                  }
-                }
-
-                // Head Pitch (Tilted down looking at notes/phone)
-                if(!lookAway && nose && forehead && chin){
-                  const headH = chin.y - forehead.y;
-                  if(headH > 25){
-                    const pitchRatio = (nose.y - forehead.y) / headH;
-                    if(pitchRatio > 0.75){
-                      lookAway = true;
-                      gazeState = "down";
-                    }
-                  }
-                }
-              }
-
-              if(lookAway){
-                consecutiveLookAway++;
-                if(statGaze){
-                  const dirLabel = gazeState === "down" ? "Down (Desk)" : gazeState === "left" || gazeState === "right" ? "Side Glance" : "Off-Screen";
-                  statGaze.textContent = `👀 ${dirLabel}`;
-                  statGaze.style.color = consecutiveLookAway >= 3 ? "#dc2626" : "#f59e0b";
-                }
-
-                // Requires 3 consecutive seconds of persistent look-away to eliminate natural saccades
-                if(consecutiveLookAway >= 3){
-                  gazeViolations++;
-                  showProctorToast(`⚠️ Gaze alert: Looking ${gazeState} detected (#${gazeViolations})`);
-                  consecutiveLookAway = 0; // Reset counter after warning
-                }
-              } else {
-                consecutiveLookAway = 0;
-                if(statGaze){
-                  statGaze.textContent = "👀 Center";
-                  statGaze.style.color = "#059669";
-                }
-              }
-            }
-          }catch(e){}
-        }
+      if(isScanBusy){
+        setTimeout(scanLoop, 1500);
+        return;
       }
-      setTimeout(scanLoop, 1000);
+      isScanBusy = true;
+
+      try {
+        if(video && video.paused && proctorStream){
+          video.play().catch(()=>{});
+        }
+        if(video && video.readyState >= 2 && cocoModel){
+          const predictions = await cocoModel.detect(video);
+          let phoneFound = false;
+          let personCount = 0;
+
+          for(const p of predictions){
+            if(p.class === "cell phone" && p.score > 0.55){
+              phoneFound = true;
+            }
+            if(p.class === "person" && p.score > 0.50){
+              personCount++;
+            }
+          }
+
+          const badge = document.getElementById("proctorBadge");
+          const bText = document.getElementById("proctorBadgeText");
+          const statPhone = document.getElementById("statPhone");
+          const statPerson = document.getElementById("statPerson");
+
+          if(statPerson) statPerson.textContent = `Persons: ${personCount}`;
+
+          if(phoneFound){
+            const now = Date.now();
+            if(now - lastPhoneTime > 3500){
+              phoneViolations++;
+              lastPhoneTime = now;
+              if(statPhone) statPhone.textContent = `Phone: ${phoneViolations}`;
+              triggerSecurityViolation("phone_detected", "Mobile phone detected in camera view", 5.0);
+            }
+            if(badge){
+              badge.className = "proctor-live-badge alert-phone";
+              if(bText) bText.textContent = "Phone Detected";
+            }
+          } else if(personCount > 1){
+            multiPersonFrames++;
+            if(multiPersonFrames >= 2){
+              multiPersonFrames = 0;
+              triggerSecurityViolation("multiple_faces", "Multiple persons detected in camera view", 5.0);
+            }
+            if(badge){
+              badge.className = "proctor-live-badge alert-person";
+              if(bText) bText.textContent = "Multiple Persons";
+            }
+          } else if(personCount === 0){
+            noPersonFrames++;
+            if(noPersonFrames >= 3){
+              noPersonFrames = 0;
+              triggerSecurityViolation("no_face", "Candidate face missing from camera view", 3.0);
+            }
+            if(badge){
+              badge.className = "proctor-live-badge alert-person";
+              if(bText) bText.textContent = "Candidate Missing";
+            }
+          } else {
+            multiPersonFrames = 0;
+            noPersonFrames = 0;
+            if(badge){
+              badge.className = "proctor-live-badge";
+              if(bText) bText.textContent = "Proctor: Active";
+            }
+          }
+        }
+      } catch(e){
+        console.warn("Scan loop error:", e);
+      } finally {
+        isScanBusy = false;
+        setTimeout(scanLoop, 1500);
+      }
     }
     scanLoop();
-  }
-
-  // ─────────────────────────────────────────────────────────────────
-  // 8. HackerRank Coding & SQL IDE Engine (Open & Hidden Test Cases)
-  // ─────────────────────────────────────────────────────────────────
-  let currentChallengeId = "two_sum";
-  let currentLanguage = "python";
-  let currentChallengeData = null;
-  let currentTestResults = [];
-
-  function switchStageTab(tab){
-    const verbalView = document.getElementById("verbalSectionView");
-    const ideView = document.getElementById("codeIDESectionView");
-    const tabVerbalBtn = document.getElementById("tabVerbalBtn");
-    const tabIdeBtn = document.getElementById("tabIdeBtn");
-
-    if(tab === "verbal"){
-      if(verbalView) verbalView.style.display = "block";
-      if(ideView) ideView.style.display = "none";
-      if(tabVerbalBtn) tabVerbalBtn.classList.add("active");
-      if(tabIdeBtn) tabIdeBtn.classList.remove("active");
-    } else {
-      if(verbalView) verbalView.style.display = "none";
-      if(ideView) ideView.style.display = "block";
-      if(tabIdeBtn) tabIdeBtn.classList.add("active");
-      if(tabVerbalBtn) tabVerbalBtn.classList.remove("active");
-      if(!currentChallengeData){
-        loadIDEChallenge(currentChallengeId);
-      }
-    }
-  }
-
-  async function loadIDEChallenge(chalId){
-    currentChallengeId = chalId;
-    const descEl = document.getElementById("ideProblemDescription");
-    const titleEl = document.getElementById("ideProblemTitle");
-    const catEl = document.getElementById("ideProblemCategory");
-    const diffEl = document.getElementById("ideDifficultyBadge");
-    const constrEl = document.getElementById("ideProblemConstraints");
-    const openCasesEl = document.getElementById("ideOpenCasesList");
-    const langSelect = document.getElementById("editorLangSelect");
-    const chalSelect = document.getElementById("challengeSelect");
-
-    if(chalSelect) chalSelect.value = chalId;
-    if(descEl) descEl.innerHTML = '<span class="spinner"></span> Loading challenge details…';
-
-    try{
-      const r = await fetch(`/interview/code/challenges/${chalId}`);
-      if(!r.ok) throw new Error("Could not load challenge");
-      const d = await r.json();
-      currentChallengeData = d;
-
-      if(titleEl) titleEl.textContent = d.title;
-      if(catEl) catEl.textContent = d.category;
-      if(diffEl) diffEl.textContent = (d.difficulty || "EASY").toUpperCase();
-      if(descEl) descEl.innerHTML = d.description;
-
-      // Populate constraints
-      if(constrEl){
-        constrEl.innerHTML = "";
-        (d.constraints || []).forEach(c => {
-          const li = document.createElement("li");
-          li.innerHTML = c;
-          constrEl.appendChild(li);
-        });
-      }
-
-      // Populate 3 Open Test Cases
-      if(openCasesEl){
-        openCasesEl.innerHTML = "";
-        (d.open_test_cases || []).forEach((tc, i) => {
-          const card = document.createElement("div");
-          card.style.cssText = "background:#F8FAFA;border:1px solid #E7EEEF;border-radius:6px;padding:0.75rem 0.9rem;margin-bottom:0.6rem;font-size:0.8rem;";
-          card.innerHTML = `
-            <div style="font-weight:700;color:var(--text);margin-bottom:0.25rem;">Test Case ${i+1}</div>
-            <div style="color:var(--text-muted);font-family:'Source Code Pro',monospace;margin-bottom:0.15rem;"><strong>Input:</strong> ${esc(tc.input_display)}</div>
-            <div style="color:#059669;font-family:'Source Code Pro',monospace;"><strong>Expected Output:</strong> ${esc(tc.expected_display)}</div>
-            ${tc.explanation ? `<div style="color:#576871;font-size:0.75rem;margin-top:0.25rem;font-style:italic;">${esc(tc.explanation)}</div>` : ''}
-          `;
-          openCasesEl.appendChild(card);
-        });
-      }
-
-      // Sync language dropdown
-      if(d.type === "sql"){
-        currentLanguage = "sql";
-        if(langSelect) {
-          langSelect.value = "sql";
-          langSelect.disabled = true;
-        }
-      } else {
-        if(currentLanguage === "sql") currentLanguage = "python";
-        if(langSelect) {
-          langSelect.value = currentLanguage;
-          langSelect.disabled = false;
-        }
-      }
-
-      resetStarterCode();
-
-    }catch(err){
-      if(descEl) descEl.textContent = "Error loading challenge: " + err.message;
-    }
-  }
-
-  function changeChallenge(chalId){
-    loadIDEChallenge(chalId);
-  }
-
-  function changeEditorLang(lang){
-    currentLanguage = lang;
-    resetStarterCode();
-  }
-
-  function resetStarterCode(){
-    const editor = document.getElementById("codeEditorText");
-    if(!editor || !currentChallengeData) return;
-    const starter = (currentChallengeData.starter_code && currentChallengeData.starter_code[currentLanguage])
-      || (currentChallengeData.starter_code && currentChallengeData.starter_code["python"])
-      || "-- Write your code here";
-    editor.value = starter;
-    document.getElementById("ideExecStatus").textContent = "Ready to run.";
-    document.getElementById("ideResultsPanel").style.display = "none";
-  }
-
-  // Handle Tab key in editor textarea
-  setTimeout(() => {
-    const codeTextarea = document.getElementById("codeEditorText");
-    if(codeTextarea){
-      codeTextarea.addEventListener("keydown", function(e){
-        if(e.key === "Tab"){
-          e.preventDefault();
-          const start = this.selectionStart;
-          const end = this.selectionEnd;
-          this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
-          this.selectionStart = this.selectionEnd = start + 4;
-        }
-      });
-    }
-  }, 100);
-
-  async function runCandidateCode(){
-    const editor = document.getElementById("codeEditorText");
-    const statusEl = document.getElementById("ideExecStatus");
-    const runBtn = document.getElementById("btnRunCode");
-    if(!editor) return;
-
-    statusEl.innerHTML = '<span class="spinner"></span> Running against 3 Open Test Cases…';
-    runBtn.disabled = true;
-
-    try{
-      const r = await fetch("/interview/code/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          challenge_id: currentChallengeId,
-          language: currentLanguage,
-          source_code: editor.value,
-          session_id: sid
-        })
-      });
-      const data = await r.json();
-      if(!r.ok) throw new Error(data.detail || "Run failed");
-
-      renderTestResults(data, "run");
-      if(data.results && data.results.some(r => r.status === "Compilation Error")){
-        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">❌ Compilation Error: Please fix syntax or type errors in your code.</span>';
-      } else if(data.results && data.results.some(r => r.status === "Runtime Error")){
-        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">❌ Runtime Error: An exception occurred during execution.</span>';
-      } else if(data.results && data.results.some(r => r.status === "Time Limit Exceeded")){
-        statusEl.innerHTML = '<span style="color:#dc2626;font-weight:700;">⏱️ Time Limit Exceeded: Check for infinite loops or non-terminating recursion.</span>';
-      } else {
-        statusEl.innerHTML = data.all_passed 
-          ? '✅ All 3 Open Test Cases Passed! You can now submit.' 
-          : `⚠️ ${data.passed_tests}/${data.total_tests} Open Test Cases Passed. Review failure below.`;
-      }
-
-    }catch(err){
-      statusEl.innerHTML = `<span style="color:#dc2626;">Error: ${esc(err.message)}</span>`;
-    }finally{
-      runBtn.disabled = false;
-    }
-  }
-
-  async function submitCandidateCode(){
-    const editor = document.getElementById("codeEditorText");
-    const statusEl = document.getElementById("ideExecStatus");
-    const subBtn = document.getElementById("btnSubmitCode");
-    if(!editor) return;
-
-    statusEl.innerHTML = '<span class="spinner"></span> Evaluating 3 Open + 3 Hidden Test Cases…';
-    subBtn.disabled = true;
-
-    try{
-      const r = await fetch("/interview/code/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sid,
-          challenge_id: currentChallengeId,
-          language: currentLanguage,
-          source_code: editor.value
-        })
-      });
-      const data = await r.json();
-      if(!r.ok) throw new Error(data.detail || "Submission failed");
-
-      renderTestResults(data, "submit");
-      statusEl.innerHTML = `🏆 Final Submission Score: <strong>${data.score_percent}%</strong> (${data.passed_tests}/${data.total_tests} test cases passed).`;
-      showProctorToast(`🎉 Code Submitted! Final Score: ${data.score_percent}% (${data.passed_tests}/${data.total_tests} passed)`);
-
-    }catch(err){
-      statusEl.innerHTML = `<span style="color:#dc2626;">Submission Error: ${esc(err.message)}</span>`;
-    }finally{
-      subBtn.disabled = false;
-    }
-  }
-
-  function renderTestResults(data, mode){
-    const panel = document.getElementById("ideResultsPanel");
-    const tabsRow = document.getElementById("ideResultTabs");
-    const titleEl = document.getElementById("ideOutputTitle");
-    const pillEl = document.getElementById("ideScorePill");
-    if(!panel || !tabsRow) return;
-
-    panel.style.display = "block";
-    currentTestResults = data.results || [];
-    titleEl.textContent = mode === "submit" ? "Submission Results (6 Total Cases)" : "Run Results (3 Open Cases)";
-
-    pillEl.innerHTML = `<span class="category-badge" style="${data.all_passed ? 'background:#EAF8ED;color:#0A6B2E;border-color:#B4E8C2;' : 'background:#FDEBE9;color:#C52D1A;border-color:#F9C0BA;'}">
-      ${data.passed_tests} / ${data.total_tests} Passed (${data.score_percent}%)
-    </span>`;
-
-    tabsRow.innerHTML = "";
-    currentTestResults.forEach((tc, idx) => {
-      const tab = document.createElement("button");
-      tab.className = `test-case-tab ${tc.passed ? 'passed' : 'failed'} ${idx === 0 ? 'active' : ''}`;
-      tab.textContent = `${tc.name} ${tc.passed ? '✓' : '✗'}`;
-      tab.onclick = () => selectResultTab(idx);
-      tabsRow.appendChild(tab);
-    });
-
-    if(currentTestResults.length > 0){
-      selectResultTab(0);
-    }
-  }
-
-  function selectResultTab(index){
-    const detailBox = document.getElementById("ideActiveCaseDetail");
-    const tabsRow = document.getElementById("ideResultTabs");
-    if(!detailBox || !tabsRow) return;
-
-    const tabs = tabsRow.querySelectorAll(".test-case-tab");
-    tabs.forEach((t, i) => {
-      if(i === index) t.classList.add("active");
-      else t.classList.remove("active");
-    });
-
-    const res = currentTestResults[index];
-    if(!res) return;
-
-    const statusColor = res.passed ? "#059669" : "#dc2626";
-    const isError = res.status && (res.status.includes("Error") || res.status.includes("Timeout"));
-    detailBox.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.4rem;">
-        <span style="font-weight:700;color:var(--text);font-size:0.85rem;">
-          ${esc(res.name)} ${res.is_hidden ? '<span style="color:#738F93;font-size:0.75rem;">(Hidden Test Case)</span>' : ''}
-        </span>
-        <span style="font-weight:700;color:${statusColor};background:${res.passed?'#EAF8ED':'#FDEBE9'};padding:0.2rem 0.55rem;border-radius:4px;font-size:0.78rem;">
-          ${esc(res.status)} (${res.execution_time_ms} ms)
-        </span>
-      </div>
-      <div style="margin-top:0.35rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;">
-        <strong>Input:</strong> <span style="color:#576871;">${esc(res.input_display)}</span>
-      </div>
-      <div style="margin-top:0.25rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;">
-        <strong>Expected Output:</strong> <span style="color:#059669;">${esc(res.expected_display)}</span>
-      </div>
-      <div style="margin-top:0.25rem;font-family:'Source Code Pro',monospace;font-size:0.8rem;color:${statusColor};">
-        <strong>Your Output:</strong> ${esc(res.actual_display)}
-      </div>
-      ${res.error ? `
-        <div style="margin-top:0.6rem;background:#0D141E;border:1px solid #EA3920;border-radius:6px;padding:0.75rem 0.9rem;">
-          <div style="font-size:0.75rem;font-weight:700;color:#EA3920;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.35rem;">
-            ⚠️ ${esc(res.status || 'Execution Error')} Output
-          </div>
-          <pre style="margin:0;font-family:'Source Code Pro',monospace;font-size:0.8rem;color:#FF8585;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${esc(res.error)}</pre>
-        </div>
-      ` : ''}
-    `;
   }
 
   init();
