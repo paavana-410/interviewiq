@@ -2246,14 +2246,23 @@ if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     if(lockMsg) lockMsg.textContent = `${reason}. Integrity penalty (-${penalty}%) logged.`;
 
     if(lockIcon) lockIcon.textContent = "!";
-    if(type === "phone_detected"){
+    const modalBtn = modal ? modal.querySelector(".btn-modal-primary") : null;
+    if(type === "fullscreen_exit"){
+      if(lockTitle) lockTitle.textContent = "Interview Paused — Fullscreen Required";
+      if(lockMsg) lockMsg.textContent = "You exited fullscreen mode. Fullscreen is strictly required during the interview. Click below to return to fullscreen and resume.";
+      if(modalBtn) modalBtn.textContent = "Return to Fullscreen & Resume";
+    } else if(type === "phone_detected"){
       if(lockTitle) lockTitle.textContent = "Interview Paused — Mobile Phone Detected";
+      if(modalBtn) modalBtn.textContent = "Resume Interview";
     } else if(type === "multiple_faces"){
       if(lockTitle) lockTitle.textContent = "Interview Paused — Multiple Faces Detected";
+      if(modalBtn) modalBtn.textContent = "Resume Interview";
     } else if(type === "no_face"){
       if(lockTitle) lockTitle.textContent = "Interview Paused — Candidate Face Missing";
+      if(modalBtn) modalBtn.textContent = "Resume Interview";
     } else if(type === "multiple_voices"){
       if(lockTitle) lockTitle.textContent = "Interview Paused — Security Violation";
+      if(modalBtn) modalBtn.textContent = "Resume Interview";
       const statAudio = document.getElementById("statAudio");
       if(statAudio) {
         statAudio.textContent = "Audio: Multi‑Voice";
@@ -2261,6 +2270,7 @@ if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
       }
     } else {
       if(lockTitle) lockTitle.textContent = "Interview Paused — Security Alert";
+      if(modalBtn) modalBtn.textContent = "Resume Interview";
     }
 
     if(modal) modal.style.display = "flex";
@@ -2275,7 +2285,25 @@ if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     triggerSecurityViolation("tab_switch", reason, 5.0);
   }
 
+  function handleFullscreenExit(){
+    if(inIntroStage || isResumingLockdown || isLockdownActive) return;
+    if(!document.fullscreenElement && !document.webkitFullscreenElement){
+      tabSwitchCount++;
+      const el = document.getElementById("statTab");
+      if(el) el.textContent = `Tabs: ${tabSwitchCount}`;
+      triggerSecurityViolation("fullscreen_exit", "Exited fullscreen mode", 5.0);
+    }
+  }
+
   function resumeFullscreen(forceWindow=false){
+    try{
+      if(document.documentElement.requestFullscreen){
+        document.documentElement.requestFullscreen().catch(()=>{});
+      }else if(document.documentElement.webkitRequestFullscreen){
+        document.documentElement.webkitRequestFullscreen().catch(()=>{});
+      }
+    }catch(e){}
+
     isResumingLockdown = true;
     isLockdownActive = false;
     lastSecurityViolationTime = Date.now();
@@ -2287,15 +2315,10 @@ if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     if(statusEl) statusEl.querySelector("span").textContent = "Interview Resumed";
     showProctorToast("Session Resumed", true);
 
-    // 5-second grace period so browser transitions don't re-trigger lockdown
+    // 4-second grace period so browser transitions don't re-trigger lockdown
     setTimeout(() => {
       isResumingLockdown = false;
-    }, 5000);
-
-    // 5-second grace period so browser transitions don't re-trigger lockdown
-    setTimeout(() => {
-      isResumingLockdown = false;
-    }, 5000);
+    }, 4000);
   }
 
   async function initProctoring(){
@@ -2348,13 +2371,8 @@ if(sa){ sa.textContent = "Audio: Clean"; sa.style.color = "#059669"; }
     startProctorScanning();
 
     // 4. Strict Tab-Switch & Screen Lockdown Listeners
-    // Fullscreen exit listener DISABLED — no forced fullscreen
-    // document.addEventListener("fullscreenchange", () => {
-    //   if(isResumingLockdown || inIntroStage || isLockdownActive) return;
-    //   if(!document.fullscreenElement){
-    //     handleLockdownViolation("Exited fullscreen mode");
-    //   }
-    // });
+    document.addEventListener("fullscreenchange", handleFullscreenExit);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenExit);
 
     document.addEventListener("visibilitychange", () => {
       if(isResumingLockdown || inIntroStage || isLockdownActive) return;
