@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interview Tutoring & Flashcard Hub — InterviewIQ</title>
+  <title>Tutoring & Placement Prep Hub — InterviewIQ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
   <style>
     :root {
       --bg: #F8FAFC;
@@ -13,9 +13,13 @@
       --border: #E2E8F0;
       --text: #0F172A;
       --muted: #64748B;
-      --primary: #2563EB;
-      --primary-hover: #1D4ED8;
-      --accent: #10B981;
+      --nav-bg: #0D141E;
+      --nav-border: #1D2432;
+      --primary: #2EC866;
+      --primary-hover: #1BA94C;
+      --dark-btn: #0D141E;
+      --dark-btn-hover: #1E293B;
+      --accent-green: #059669;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -26,10 +30,13 @@
       display: flex;
       flex-direction: column;
     }
+
+    /* ── Top Navigation Bar (Uniform HackerRank Black/Navy Palette) ── */
     header {
-      background: var(--card-bg);
-      border-bottom: 1px solid var(--border);
-      padding: 0.9rem 2rem;
+      background: var(--nav-bg);
+      border-bottom: 1px solid var(--nav-border);
+      padding: 0 2.5rem;
+      height: 58px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -42,93 +49,173 @@
       align-items: center;
       gap: 0.75rem;
       text-decoration: none;
-      color: inherit;
+      color: #FFFFFF;
     }
     .brand-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #10B981, #059669);
-      color: #fff;
-      border-radius: 8px;
+      width: 30px;
+      height: 30px;
+      background: #00EA64;
+      color: #0D141E;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
-      font-size: 1rem;
+      font-size: 0.95rem;
+      font-family: 'JetBrains Mono', monospace;
     }
     .brand-title {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.01em;
     }
     .brand-subtitle {
       font-size: 0.75rem;
-      color: var(--muted);
+      color: #94A3B8;
       font-weight: 500;
+      margin-left: 0.25rem;
     }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
+      gap: 1.6rem;
     }
     .nav-link {
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 600;
-      color: var(--muted);
+      color: #C2C7D0;
       text-decoration: none;
       transition: color 0.15s;
     }
     .nav-link:hover, .nav-link.active {
-      color: var(--primary);
+      color: #FFFFFF;
     }
+    .nav-link.active {
+      color: #00EA64;
+      border-bottom: 2px solid #00EA64;
+      padding-bottom: 18px;
+      margin-bottom: -18px;
+    }
+
     .container {
-      max-width: 960px;
+      max-width: 1140px;
       margin: 0 auto;
-      padding: 2.5rem 1.5rem 5rem;
+      padding: 2.25rem 1.5rem 5rem;
       width: 100%;
     }
     .page-header {
       text-align: center;
-      margin-bottom: 2.5rem;
-    }
-    .page-title {
-      font-size: 1.85rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-    }
-    .page-desc {
-      font-size: 0.95rem;
-      color: var(--muted);
-      margin-top: 0.5rem;
-    }
-    .filter-tabs {
-      display: flex;
-      justify-content: center;
-      gap: 0.75rem;
       margin-bottom: 2rem;
     }
-    .tab-btn {
-      padding: 0.5rem 1.25rem;
-      border-radius: 20px;
-      font-family: inherit;
-      font-size: 0.85rem;
-      font-weight: 600;
-      border: 1px solid var(--border);
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0F172A;
+    }
+    .page-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    /* ── Main Section Selector Tabs ── */
+    .module-nav {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
       background: #FFFFFF;
+      padding: 0.4rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      max-width: 620px;
+      margin: 0 auto 2.5rem;
+    }
+    .module-btn {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 700;
       color: var(--muted);
       cursor: pointer;
       transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
     }
-    .tab-btn.active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
+    .module-btn:hover { color: #0F172A; }
+    .module-btn.active {
+      background: #0D141E;
+      color: #00EA64;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    
-    /* Flashcard Container & 3D Flip */
+
+    /* ── SECTION 1: Interactive Roadmap & Key-Points Flashcards ── */
+    .roadmap-container {
+      margin-bottom: 2.25rem;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem 1.75rem;
+    }
+    .roadmap-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .milestones-track {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      position: relative;
+    }
+    .milestone-item {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+    .milestone-item:hover {
+      border-color: #0F172A;
+      transform: translateY(-2px);
+    }
+    .milestone-item.active {
+      background: #0D141E;
+      color: #FFFFFF;
+      border-color: #0D141E;
+    }
+    .milestone-step {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: #00EA64;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .milestone-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+      line-height: 1.35;
+    }
+
+    /* 3D Key-Points Flashcard */
     .flashcard-stage {
-      perspective: 1000px;
-      margin: 0 auto 2rem;
+      perspective: 1200px;
+      margin: 0 auto 1.5rem;
       max-width: 680px;
       height: 380px;
     }
@@ -136,7 +223,7 @@
       position: relative;
       width: 100%;
       height: 100%;
-      text-align: center;
+      text-align: left;
       transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       transform-style: preserve-3d;
       cursor: pointer;
@@ -150,84 +237,70 @@
       height: 100%;
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
-      border-radius: 16px;
-      background: var(--card-bg);
+      border-radius: 12px;
+      background: #FFFFFF;
       border: 1px solid var(--border);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-      padding: 2.5rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      padding: 2.25rem;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
     .flashcard-back {
       transform: rotateY(180deg);
-      background: linear-gradient(180deg, #FFFFFF, #F8FAFC);
-      text-align: left;
+      background: #FFFFFF;
     }
     .card-top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-bottom: 1px solid #F1F5F9;
+      padding-bottom: 0.75rem;
     }
-    .card-meta {
+    .card-domain {
       font-size: 0.75rem;
-      font-weight: 700;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: var(--primary);
+      color: #047857;
+      font-family: 'JetBrains Mono', monospace;
     }
-    .card-diff {
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.2rem 0.6rem;
-      border-radius: 12px;
-      background: #F1F5F9;
-      color: #475569;
-    }
-    .card-question {
-      font-size: 1.25rem;
-      font-weight: 700;
-      line-height: 1.5;
+    .card-topic-title {
+      font-size: 1.35rem;
+      font-weight: 800;
       color: #0F172A;
-      margin: auto 0;
+      margin-top: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .card-points-list {
+      margin-top: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .card-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+      color: #334155;
+      line-height: 1.45;
+    }
+    .card-point-dot {
+      width: 6px;
+      height: 6px;
+      background: #00EA64;
+      border-radius: 50%;
+      margin-top: 0.45rem;
+      flex-shrink: 0;
     }
     .card-flip-prompt {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--muted);
-      font-weight: 500;
-    }
-    
-    .concepts-header {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      margin-bottom: 0.6rem;
-    }
-    .concepts-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
-    }
-    .concept-tag {
-      background: #EFF6FF;
-      color: #1D4ED8;
-      border: 1px solid #BFDBFE;
-      padding: 0.3rem 0.75rem;
-      border-radius: 6px;
-      font-size: 0.82rem;
       font-weight: 600;
-    }
-    .card-guide {
-      font-size: 0.88rem;
-      line-height: 1.5;
-      color: #334155;
-      background: #F8FAFC;
-      border-left: 3px solid var(--primary);
-      padding: 0.75rem 1rem;
-      border-radius: 4px;
+      text-align: center;
+      padding-top: 0.75rem;
+      border-top: 1px solid #F1F5F9;
     }
 
     .controls-row {
@@ -242,48 +315,255 @@
       border: 1px solid var(--border);
       color: #0F172A;
       padding: 0.65rem 1.4rem;
-      border-radius: 8px;
+      border-radius: 6px;
       font-family: inherit;
-      font-weight: 600;
-      font-size: 0.88rem;
+      font-weight: 700;
+      font-size: 0.86rem;
       cursor: pointer;
       transition: all 0.15s;
     }
-    .btn-nav:hover { background: #F8FAFC; border-color: #CBD5E1; }
+    .btn-nav:hover { background: #F8FAFC; border-color: #0D141E; }
     .btn-flip {
-      background: var(--primary);
-      color: #fff;
+      background: #0D141E;
+      color: #00EA64;
       border: none;
-      padding: 0.65rem 1.5rem;
-      border-radius: 8px;
+      padding: 0.65rem 1.6rem;
+      border-radius: 6px;
       font-family: inherit;
-      font-weight: 600;
-      font-size: 0.88rem;
+      font-weight: 700;
+      font-size: 0.86rem;
       cursor: pointer;
     }
-    .btn-flip:hover { background: var(--primary-hover); }
+    .btn-flip:hover { background: #1E293B; }
     .card-counter {
       font-size: 0.85rem;
       color: var(--muted);
-      font-weight: 600;
+      font-weight: 700;
       min-width: 65px;
       text-align: center;
+      font-family: 'JetBrains Mono', monospace;
     }
+
+    /* ── SECTION 2: Study Materials (.pdf) ── */
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+    .doc-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .doc-card:hover {
+      border-color: #0F172A;
+      transform: translateY(-2px);
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      background: #0D141E;
+      color: #00EA64;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 0.75rem;
+    }
+    .doc-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 0.45rem;
+    }
+    .doc-desc {
+      font-size: 0.84rem;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-bottom: 1.25rem;
+    }
+    .doc-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .btn-doc {
+      flex: 1;
+      padding: 0.6rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      font-family: inherit;
+    }
+    .btn-doc-view {
+      background: #0D141E;
+      color: #FFFFFF;
+      border: none;
+    }
+    .btn-doc-view:hover { background: #1E293B; }
+    .btn-doc-download {
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid var(--border);
+    }
+    .btn-doc-download:hover { background: #F8FAFC; border-color: #0D141E; }
+
+    /* ── SECTION 3: Practice MCQ Quiz ── */
+    .quiz-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .quiz-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .quiz-score-badge {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #047857;
+      background: #ECFDF5;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .quiz-question {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.45;
+      margin-bottom: 1.5rem;
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .quiz-opt {
+      padding: 0.95rem 1.15rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #FFFFFF;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .quiz-opt:hover {
+      background: #F8FAFC;
+      border-color: #0D141E;
+    }
+    .quiz-opt.correct {
+      background: #ECFDF5;
+      border-color: #059669;
+      color: #065F46;
+    }
+    .quiz-opt.wrong {
+      background: #FEF2F2;
+      border-color: #DC2626;
+      color: #991B1B;
+    }
+    .quiz-feedback {
+      background: #F8FAFC;
+      border-left: 3px solid #0D141E;
+      padding: 0.9rem 1.1rem;
+      border-radius: 4px;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #334155;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
+    /* Modal for Viewing PDF / Notes */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(13, 20, 30, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-card {
+      background: #FFFFFF;
+      border-radius: 12px;
+      max-width: 820px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .modal-header {
+      background: #0D141E;
+      color: #FFFFFF;
+      padding: 1.15rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-title { font-size: 1.05rem; font-weight: 700; }
+    .modal-body {
+      padding: 1.75rem;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #334155;
+    }
+    .modal-body h3 {
+      color: #0F172A;
+      margin: 1.25rem 0 0.5rem;
+      font-size: 1.05rem;
+    }
+    .modal-body p { margin-bottom: 0.75rem; }
+    .modal-body ul { margin-left: 1.25rem; margin-bottom: 1rem; }
+    .modal-body li { margin-bottom: 0.35rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #94A3B8;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+    .modal-close:hover { color: #FFFFFF; }
   </style>
 </head>
 <body>
 
-  <!-- Top Navbar -->
+  <!-- Uniform Top Navbar -->
   <header>
     <a href="/ui/" class="brand">
       <div class="brand-logo">IQ</div>
       <div>
         <div class="brand-title">InterviewIQ</div>
-        <div class="brand-subtitle">Tutoring & Placement Prep Hub</div>
       </div>
+      <span class="brand-subtitle">· Tutoring & Placement Prep Hub</span>
     </a>
     <nav class="nav-links">
-      <a href="/ui/" class="nav-link">Candidate Interview</a>
+      <a href="/ui/" class="nav-link">Practice Interview</a>
       <a href="/ui/prep.html" class="nav-link active">Tutoring & Prep</a>
       <a href="/ui/admin.html" class="nav-link">Admin Portal</a>
     </nav>
@@ -291,97 +571,331 @@
 
   <main class="container">
     <div class="page-header">
-      <h1 class="page-title">Interactive Placement Flashcards</h1>
-      <p class="page-desc">Master core technical concepts and STAR behavioral frameworks with instant rubrics.</p>
+      <h1 class="page-title">Candidate Tutoring & Placement Prep Hub</h1>
+      <p class="page-desc">Structured learning path for Computer Science engineering placements — Concept Flashcards, Notes & Practice MCQs.</p>
     </div>
 
-    <!-- Category Filters -->
-    <div class="filter-tabs">
-      <button class="tab-btn active" onclick="setCategory('all', this)">All Questions</button>
-      <button class="tab-btn" onclick="setCategory('technical', this)">Technical Only</button>
-      <button class="tab-btn" onclick="setCategory('behavioral', this)">Behavioral & HR</button>
+    <!-- ── Module Switcher ── -->
+    <div class="module-nav">
+      <button class="module-btn active" id="tabFlashcards" onclick="switchSection('flashcards')">
+        Concept Flashcards
+      </button>
+      <button class="module-btn" id="tabNotes" onclick="switchSection('notes')">
+        Technical Notes (.pdf)
+      </button>
+      <button class="module-btn" id="tabQuiz" onclick="switchSection('quiz')">
+        Practice MCQ Quiz
+      </button>
     </div>
 
-    <!-- Flashcard Stage -->
-    <div class="flashcard-stage">
-      <div class="flashcard-inner" id="flashcard" onclick="toggleFlip()">
-        
-        <!-- Front Side -->
-        <div class="flashcard-front">
-          <div class="card-top-bar">
-            <span class="card-meta" id="cardCategory">TECHNICAL · CORE CS</span>
-            <span class="card-diff" id="cardDifficulty">MEDIUM</span>
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 1: Interactive Roadmap & Key-Points Flashcards           -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <div id="sectionFlashcards">
+      
+      <!-- Interactive Milestone Roadmap -->
+      <div class="roadmap-container">
+        <div class="roadmap-title">
+          <span>Campus Placement Curriculum Roadmap</span>
+          <span style="color:#00EA64;">Click milestone to jump</span>
+        </div>
+        <div class="milestones-track">
+          <div class="milestone-item active" onclick="jumpMilestone(0)">
+            <div class="milestone-step">Phase 01</div>
+            <div class="milestone-name">Operating Systems & Virtual Memory</div>
           </div>
-          <div class="card-question" id="cardQuestion">Loading question...</div>
-          <div class="card-flip-prompt">Click card or press Flip to reveal expected rubric concepts</div>
+          <div class="milestone-item" onclick="jumpMilestone(1)">
+            <div class="milestone-step">Phase 02</div>
+            <div class="milestone-name">DBMS Indexing & ACID Transactions</div>
+          </div>
+          <div class="milestone-item" onclick="jumpMilestone(2)">
+            <div class="milestone-step">Phase 03</div>
+            <div class="milestone-name">Computer Networks & Handshakes</div>
+          </div>
+          <div class="milestone-item" onclick="jumpMilestone(3)">
+            <div class="milestone-step">Phase 04</div>
+            <div class="milestone-name">DSA & Algorithmic Complexities</div>
+          </div>
+          <div class="milestone-item" onclick="jumpMilestone(4)">
+            <div class="milestone-step">Phase 05</div>
+            <div class="milestone-name">STAR Behavioral Framework</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key-Points Animated Flashcard -->
+      <div class="flashcard-stage">
+        <div class="flashcard-inner" id="flashcard" onclick="toggleFlip()">
+          
+          <!-- Front: Core Concept Breakdown -->
+          <div class="flashcard-front">
+            <div class="card-top-bar">
+              <span class="card-domain" id="cardDomain">COMPUTER SCIENCE · PHASE 01</span>
+              <span style="font-size:0.75rem;font-weight:700;color:var(--muted);" id="cardCategoryTag">TECHNICAL CORE</span>
+            </div>
+            <div>
+              <div class="card-topic-title" id="cardTopicTitle">Virtual Memory & Paging Mechanisms</div>
+              <div class="card-points-list" id="cardFrontPoints">
+                <!-- Points loaded dynamically -->
+              </div>
+            </div>
+            <div class="card-flip-prompt">Click card or press Flip to view High-Yield Interview Expectations & Trade-offs</div>
+          </div>
+
+          <!-- Back: Interview Pointers & Rubric Focus -->
+          <div class="flashcard-back">
+            <div class="card-top-bar">
+              <span class="card-domain" style="color:#0D141E;">INTERVIEW EVALUATION CRITERIA</span>
+              <span style="font-size:0.75rem;font-weight:700;color:#047857;">HIGH-YIELD POINTERS</span>
+            </div>
+            <div>
+              <div class="card-topic-title" style="font-size:1.15rem;" id="cardBackTitle">What Placement Interviewers Look For:</div>
+              <div class="card-points-list" id="cardBackPoints">
+                <!-- Back points loaded dynamically -->
+              </div>
+            </div>
+            <div class="card-flip-prompt">Click card to return to core concept points</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Navigation Controls -->
+      <div class="controls-row">
+        <button class="btn-nav" onclick="prevCard()">← Previous Concept</button>
+        <button class="btn-flip" onclick="toggleFlip()">Flip Card</button>
+        <button class="btn-nav" onclick="nextCard()">Next Concept →</button>
+        <span class="card-counter" id="cardCounter">1 / 5</span>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 2: Technical Notes & Study Materials (.pdf)              -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <div id="sectionNotes" style="display:none;">
+      <div class="docs-grid">
+
+        <div class="doc-card">
+          <div>
+            <span class="doc-badge">PDF DOCUMENT</span>
+            <div class="doc-title">Operating Systems Placement Digest.pdf</div>
+            <div class="doc-desc">Comprehensive reference on Paging vs Segmentation, Mutex vs Counting Semaphores, Deadlock Coffman conditions, and CPU Scheduling algorithms.</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn-doc btn-doc-view" onclick="openDocModal('os')">View Notes</button>
+            <button class="btn-doc btn-doc-download" onclick="downloadDoc('Operating_Systems_Digest.pdf', 'os')">Download PDF</button>
+          </div>
         </div>
 
-        <!-- Back Side -->
-        <div class="flashcard-back">
-          <div class="card-top-bar">
-            <span class="card-meta" style="color:var(--accent);">EVALUATION RUBRIC</span>
-            <span class="card-diff" id="cardBackDomain">DBMS</span>
+        <div class="doc-card">
+          <div>
+            <span class="doc-badge">PDF DOCUMENT</span>
+            <div class="doc-title">DBMS & SQL Architecture Handbook.pdf</div>
+            <div class="doc-desc">Essential guide to ACID transactions, Normalization (1NF, 2NF, 3NF, BCNF), B+ Trees vs Hash Indexing, Isolation Levels, and Query Optimization.</div>
           </div>
-          <div style="margin: auto 0;">
-            <div class="concepts-header">Key Rubric Concepts Evaluated:</div>
-            <div class="concepts-tags" id="cardConcepts"></div>
-            <div class="concepts-header">Model Scoring Guide:</div>
-            <div class="card-guide" id="cardGuide"></div>
+          <div class="doc-actions">
+            <button class="btn-doc btn-doc-view" onclick="openDocModal('dbms')">View Notes</button>
+            <button class="btn-doc btn-doc-download" onclick="downloadDoc('DBMS_SQL_Handbook.pdf', 'dbms')">Download PDF</button>
           </div>
-          <div class="card-flip-prompt">Click card to return to question</div>
+        </div>
+
+        <div class="doc-card">
+          <div>
+            <span class="doc-badge">PDF DOCUMENT</span>
+            <div class="doc-title">Computer Networks Protocol Standards.pdf</div>
+            <div class="doc-desc">Covers OSI vs TCP/IP models, TCP 3-Way Handshake & 4-Way Teardown, Congestion Control, DNS Resolution steps, and HTTP/1.1 vs HTTP/2 vs HTTP/3.</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn-doc btn-doc-view" onclick="openDocModal('cn')">View Notes</button>
+            <button class="btn-doc btn-doc-download" onclick="downloadDoc('Computer_Networks_Guide.pdf', 'cn')">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="doc-card">
+          <div>
+            <span class="doc-badge">PDF DOCUMENT</span>
+            <div class="doc-title">Data Structures & Algorithmic Trade-offs.pdf</div>
+            <div class="doc-desc">Big-O cheat sheet, Tree & Graph traversals (BFS, DFS, Dijkstra), Balanced BSTs, Hash Collisions resolution, and Dynamic Programming foundations.</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn-doc btn-doc-view" onclick="openDocModal('dsa')">View Notes</button>
+            <button class="btn-doc btn-doc-download" onclick="downloadDoc('DSA_Algorithms_CheatSheet.pdf', 'dsa')">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="doc-card">
+          <div>
+            <span class="doc-badge">PDF DOCUMENT</span>
+            <div class="doc-title">Behavioral STAR Framework Mastery Guide.pdf</div>
+            <div class="doc-desc">Complete handbook for campus HR rounds. Structured templates for Situation, Task, Action, and Result addressing conflict, leadership, and deadlines.</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn-doc btn-doc-view" onclick="openDocModal('star')">View Notes</button>
+            <button class="btn-doc btn-doc-download" onclick="downloadDoc('STAR_Behavioral_Mastery.pdf', 'star')">Download PDF</button>
+          </div>
         </div>
 
       </div>
     </div>
 
-    <!-- Navigation Controls -->
-    <div class="controls-row">
-      <button class="btn-nav" onclick="prevCard()">← Previous</button>
-      <button class="btn-flip" onclick="toggleFlip()">Flip Card</button>
-      <button class="btn-nav" onclick="nextCard()">Next →</button>
-      <span class="card-counter" id="cardCounter">1 / —</span>
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 3: Practice MCQ Quiz                                     -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <div id="sectionQuiz" style="display:none;">
+      <div class="quiz-card">
+        <div class="quiz-top">
+          <span style="font-size:0.8rem;font-weight:800;color:var(--muted);font-family:'JetBrains Mono',monospace;" id="quizCounter">QUESTION 1 OF 5</span>
+          <span class="quiz-score-badge" id="quizScoreBadge">SCORE: 0 / 0</span>
+        </div>
+        <div class="quiz-question" id="quizQuestionText">Loading question...</div>
+        <div class="quiz-options" id="quizOptionsContainer"></div>
+        <div class="quiz-feedback" id="quizFeedbackBox"></div>
+        <div style="text-align:right;">
+          <button class="btn-nav" id="btnNextQuiz" onclick="nextQuizQuestion()" style="display:none;">Next Question →</button>
+        </div>
+      </div>
     </div>
 
   </main>
 
+  <!-- Document View Modal -->
+  <div class="modal-overlay" id="docModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modalDocTitle">Document Viewer</div>
+        <button class="modal-close" onclick="closeDocModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalDocContent"></div>
+    </div>
+  </div>
+
   <script>
-    let cards = [];
-    let currentIndex = 0;
-    let currentCategory = "all";
-
-    async function fetchCards(category) {
-      try {
-        const res = await fetch(`/admin/flashcards?category=${category}`);
-        if(!res.ok) throw new Error("Could not load flashcards");
-        cards = await res.json();
-        currentIndex = 0;
-        renderCard();
-      } catch(err) {
-        document.getElementById("cardQuestion").textContent = "No flashcards found.";
+    // ── 1. Flashcard Data (Structured Key Points & Trade-offs) ──
+    const flashcardsData = [
+      {
+        phase: "PHASE 01 · OPERATING SYSTEMS",
+        category: "TECHNICAL CORE",
+        title: "Virtual Memory & Paging Mechanisms",
+        frontPoints: [
+          "Virtual Memory separates logical user address space from physical RAM, allowing execution of processes larger than physical memory.",
+          "Paging eliminates external fragmentation by dividing physical memory into fixed-size Frames and logical memory into Pages.",
+          "Page Table maps page numbers to frame numbers. Translation Lookaside Buffer (TLB) acts as a high-speed associative hardware cache.",
+          "Page Fault occurs when an accessed page is not currently resident in physical RAM, triggering an OS trap to load from secondary storage."
+        ],
+        backTitle: "High-Yield Interview Evaluation Criteria:",
+        backPoints: [
+          "Key Metric: Explain effective memory access time (EMAT) formula based on TLB hit ratio.",
+          "Common Trade-off: Inverted Page Tables save memory overhead for 64-bit systems at the cost of slower lookup times.",
+          "Avoid Pitfall: Clarify that paging eliminates external fragmentation, but internal fragmentation can still occur in the final page.",
+          "Model Answer Key: Mention LRU, FIFO, or Second-Chance page replacement algorithms and Belady's Anomaly."
+        ]
+      },
+      {
+        phase: "PHASE 02 · DBMS & TRANSACTIONS",
+        category: "TECHNICAL CORE",
+        title: "ACID Properties & Database Indexing",
+        frontPoints: [
+          "Atomicity: 'All or nothing' execution managed via Write-Ahead Logging (WAL) and undo/redo buffers.",
+          "Consistency: Ensures transaction brings database from one valid state to another, preserving integrity constraints.",
+          "Isolation: Concurrent transactions execute independently without interference, guarded by Two-Phase Locking (2PL) or MVCC.",
+          "Durability: Committed transactions persist permanently even across system power crashes via persistent write logs."
+        ],
+        backTitle: "High-Yield Interview Evaluation Criteria:",
+        backPoints: [
+          "B+ Tree vs Hash Index: B+ Trees support range queries (BETWEEN, >, <) because leaf nodes are sequentially linked; Hash index only supports exact equality (=).",
+          "Isolation Anomalies: Dirty Read (read uncommitted), Non-repeatable Read (update commit), and Phantom Read (insert/delete commit).",
+          "Index Overhead: Explain that adding indexes accelerates SELECT queries but penalizes INSERT/UPDATE operations due to rebalancing."
+        ]
+      },
+      {
+        phase: "PHASE 03 · COMPUTER NETWORKS",
+        category: "TECHNICAL CORE",
+        title: "TCP 3-Way Handshake & Connection States",
+        frontPoints: [
+          "Step 1 (SYN): Client sends SYN packet with an initial sequence number (ISN_c) to server. State: SYN-SENT.",
+          "Step 2 (SYN-ACK): Server allocates buffers, responds with SYN, server sequence number (ISN_s), and ACK = ISN_c + 1. State: SYN-RECEIVED.",
+          "Step 3 (ACK): Client replies with ACK = ISN_s + 1. Both endpoints transition to ESTABLISHED state and bidirectional data flow begins.",
+          "Reliability: Guaranteed via sequence numbers, checksums, selective acknowledgments (SACK), and exponential backoff timers."
+        ],
+        backTitle: "High-Yield Interview Evaluation Criteria:",
+        backPoints: [
+          "Why not 2-way handshake? A 2-way handshake cannot guard against delayed duplicate SYN packets from old disconnected sessions.",
+          "TCP vs UDP: TCP is connection-oriented with congestion control (windowing); UDP is connectionless with low latency for VoIP/Gaming.",
+          "Connection Teardown: Uses 4-way FIN/ACK handshake. Candidate should explain the purpose of the TIME_WAIT state (2*MSL)."
+        ]
+      },
+      {
+        phase: "PHASE 04 · DATA STRUCTURES",
+        category: "TECHNICAL CORE",
+        title: "Algorithmic Complexity & Hash Tables",
+        frontPoints: [
+          "Hash Table provides O(1) average time complexity for Insert, Delete, and Lookup via hash function key hashing.",
+          "Hash Collision Resolution: Separate Chaining (linked lists/red-black trees at buckets) vs Open Addressing (Linear/Quadratic probing, Double hashing).",
+          "Load Factor (α = n/k): When α exceeds threshold (typically 0.75), rehashing occurs with doubled bucket array capacity.",
+          "Worst-Case: Degenerates to O(n) if all keys hash to the same bucket (mitigated by Java 8 treeification to O(log n))."
+        ],
+        backTitle: "High-Yield Interview Evaluation Criteria:",
+        backPoints: [
+          "Time-Space Trade-off: Hash maps trade additional memory overhead for constant-time lookup performance.",
+          "Tree vs Hash: Use Balanced BST (Red-Black / AVL) when sorted order traversal or range queries are required.",
+          "Model Answer Key: Mention uniform distribution property of good cryptographic/non-cryptographic hash algorithms (MurmurHash)."
+        ]
+      },
+      {
+        phase: "PHASE 05 · BEHAVIORAL MASTERY",
+        category: "HR & SITUATIONAL",
+        title: "The STAR Framework for Behavioral Rounds",
+        frontPoints: [
+          "Situation (S): Set the scene, context, and project scope concisely (10-15% of response time).",
+          "Task (T): Define the specific challenge, responsibility, or technical roadblock you owned (10-15%).",
+          "Action (A): Elaborate on the exact technical or collaborative decisions YOU executed to resolve it (60%).",
+          "Result (R): Conclude with quantifiable business impact, metrics, or lessons learned (15%)."
+        ],
+        backTitle: "High-Yield Interview Evaluation Criteria:",
+        backPoints: [
+          "Ownership Anchor: Focus on 'I designed...', 'I investigated...' rather than generic 'We did...'.",
+          "Quantifiable Results: E.g., 'Reduced API latency by 35%', 'Resolved the merge dispute and delivered sprint 2 days early.'",
+          "Conflict Handling: Demonstrate emotional intelligence, active listening, and depersonalizing conflicts to focus on technical data."
+        ]
       }
-    }
+    ];
 
-    function renderCard() {
+    let currentCardIndex = 0;
+
+    function renderFlashcard() {
+      const c = flashcardsData[currentCardIndex];
       const cardEl = document.getElementById("flashcard");
       cardEl.classList.remove("flipped");
 
-      if(!cards.length) {
-        document.getElementById("cardQuestion").textContent = "No cards available in this category.";
-        document.getElementById("cardCounter").textContent = "0 / 0";
-        return;
-      }
+      document.getElementById("cardDomain").textContent = c.phase;
+      document.getElementById("cardCategoryTag").textContent = c.category;
+      document.getElementById("cardTopicTitle").textContent = c.title;
 
-      const c = cards[currentIndex];
-      document.getElementById("cardCategory").textContent = `${c.category.toUpperCase()} · ${c.domain.toUpperCase()}`;
-      document.getElementById("cardDifficulty").textContent = c.difficulty.toUpperCase();
-      document.getElementById("cardQuestion").textContent = c.question;
+      const fList = document.getElementById("cardFrontPoints");
+      fList.innerHTML = c.frontPoints.map(p => `
+        <div class="card-point">
+          <div class="card-point-dot"></div>
+          <div>${p}</div>
+        </div>
+      `).join("");
 
-      document.getElementById("cardBackDomain").textContent = c.domain;
-      const conceptsDiv = document.getElementById("cardConcepts");
-      conceptsDiv.innerHTML = (c.key_concepts || []).map(concept => `<span class="concept-tag">${esc(concept)}</span>`).join("");
-      document.getElementById("cardGuide").textContent = c.study_notes || "Demonstrate clear conceptual understanding and structured problem-solving.";
+      document.getElementById("cardBackTitle").textContent = c.backTitle;
+      const bList = document.getElementById("cardBackPoints");
+      bList.innerHTML = c.backPoints.map(p => `
+        <div class="card-point">
+          <div class="card-point-dot" style="background:#0D141E;"></div>
+          <div>${p}</div>
+        </div>
+      `).join("");
 
-      document.getElementById("cardCounter").textContent = `${currentIndex + 1} / ${cards.length}`;
+      document.getElementById("cardCounter").textContent = `${currentCardIndex + 1} / ${flashcardsData.length}`;
+
+      // Highlight active milestone
+      document.querySelectorAll(".milestone-item").forEach((m, idx) => {
+        if(idx === currentCardIndex) m.classList.add("active");
+        else m.classList.remove("active");
+      });
     }
 
     function toggleFlip() {
@@ -389,42 +903,267 @@
     }
 
     function nextCard() {
-      if(!cards.length) return;
-      currentIndex = (currentIndex + 1) % cards.length;
-      renderCard();
+      currentCardIndex = (currentCardIndex + 1) % flashcardsData.length;
+      renderFlashcard();
     }
 
     function prevCard() {
-      if(!cards.length) return;
-      currentIndex = (currentIndex - 1 + cards.length) % cards.length;
-      renderCard();
+      currentCardIndex = (currentCardIndex - 1 + flashcardsData.length) % flashcardsData.length;
+      renderFlashcard();
     }
 
-    function setCategory(cat, btn) {
-      currentCategory = cat;
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      fetchCards(cat);
+    function jumpMilestone(idx) {
+      currentCardIndex = idx;
+      renderFlashcard();
     }
 
-    function esc(s) {
-      if(!s) return "";
-      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+    // ── 2. Module Tab Switcher ──
+    function switchSection(sec) {
+      document.getElementById("sectionFlashcards").style.display = sec === 'flashcards' ? 'block' : 'none';
+      document.getElementById("sectionNotes").style.display = sec === 'notes' ? 'block' : 'none';
+      document.getElementById("sectionQuiz").style.display = sec === 'quiz' ? 'block' : 'none';
 
-    // Keyboard navigation (Left, Right, Space)
-    document.addEventListener("keydown", (e) => {
-      if(e.code === "Space") {
-        e.preventDefault();
-        toggleFlip();
-      } else if(e.code === "ArrowRight") {
-        nextCard();
-      } else if(e.code === "ArrowLeft") {
-        prevCard();
+      document.getElementById("tabFlashcards").classList.toggle("active", sec === 'flashcards');
+      document.getElementById("tabNotes").classList.toggle("active", sec === 'notes');
+      document.getElementById("tabQuiz").classList.toggle("active", sec === 'quiz');
+
+      if(sec === 'quiz' && quizStarted === false) {
+        loadQuizQuestion(0);
       }
-    });
+    }
 
-    fetchCards("all");
+    // ── 3. Technical Notes & PDF Documents ──
+    const docContents = {
+      os: {
+        title: "Operating Systems Placement Digest",
+        content: `
+          <h3>1. Virtual Memory & Paging</h3>
+          <p>Virtual memory provides each process with its own continuous virtual address space. It eliminates external fragmentation through fixed-size pages. Address translation uses the Translation Lookaside Buffer (TLB) cache.</p>
+          <ul>
+            <li><strong>Page Fault:</strong> Triggered via CPU interrupt when a page's valid bit is 0. OS brings page from disk swap to physical RAM.</li>
+            <li><strong>Thrashing:</strong> High paging activity when working set size exceeds available physical memory frames.</li>
+          </ul>
+          <h3>2. Process Synchronization</h3>
+          <ul>
+            <li><strong>Mutex:</strong> Mutual exclusion lock owned by one thread (locking/unlocking done by same thread).</li>
+            <li><strong>Counting Semaphore:</strong> Integer variable used to control concurrent access to finite resource pool.</li>
+            <li><strong>Deadlock Conditions:</strong> Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait (Coffman conditions).</li>
+          </ul>
+        `
+      },
+      dbms: {
+        title: "DBMS & SQL Architecture Handbook",
+        content: `
+          <h3>1. Transaction Management (ACID)</h3>
+          <ul>
+            <li><strong>Atomicity:</strong> All operations succeed or all roll back via Write-Ahead Logging (WAL).</li>
+            <li><strong>Consistency:</strong> Preserves integrity constraints (foreign keys, uniqueness).</li>
+            <li><strong>Isolation:</strong> Multi-Version Concurrency Control (MVCC) or Two-Phase Locking (2PL).</li>
+            <li><strong>Durability:</strong> Changes survive system crashes once committed.</li>
+          </ul>
+          <h3>2. Normalization & Indexing</h3>
+          <ul>
+            <li><strong>1NF:</strong> Atomic values, no repeating groups.</li>
+            <li><strong>2NF:</strong> 1NF + no partial dependency on composite key.</li>
+            <li><strong>3NF:</strong> 2NF + no transitive dependency.</li>
+            <li><strong>B+ Trees:</strong> Balanced tree structure where all data is stored at leaf nodes connected in a doubly linked list for O(log n) searches and efficient range scans.</li>
+          </ul>
+        `
+      },
+      cn: {
+        title: "Computer Networks Protocol Standards",
+        content: `
+          <h3>1. Transport Layer Protocols</h3>
+          <ul>
+            <li><strong>TCP:</strong> Connection-oriented, reliable, ordered delivery with flow control (sliding window) and congestion control (Slow Start, Congestion Avoidance, Fast Retransmit).</li>
+            <li><strong>UDP:</strong> Connectionless, lightweight, low-latency, best-effort delivery without sequence checking.</li>
+          </ul>
+          <h3>2. Core Internet Protocols</h3>
+          <ul>
+            <li><strong>DNS:</strong> Recursive and iterative resolution translating human domain names to IP addresses (Port 53).</li>
+            <li><strong>HTTP/2 vs HTTP/3:</strong> HTTP/2 introduces binary framing and multiplexing over single TCP connection; HTTP/3 moves to QUIC (over UDP) to eliminate head-of-line blocking.</li>
+          </ul>
+        `
+      },
+      dsa: {
+        title: "Data Structures & Algorithmic Trade-offs",
+        content: `
+          <h3>1. Asymptotic Complexity Reference</h3>
+          <ul>
+            <li><strong>Hash Map:</strong> O(1) avg insert/search, O(n) worst-case collision.</li>
+            <li><strong>Balanced BST (AVL / Red-Black):</strong> O(log n) worst-case insert, search, delete.</li>
+            <li><strong>Quick Sort:</strong> O(n log n) average, O(n²) worst-case (mitigated by randomized pivot).</li>
+            <li><strong>Merge Sort:</strong> Guaranteed O(n log n) time at the cost of O(n) auxiliary memory.</li>
+          </ul>
+        `
+      },
+      star: {
+        title: "Behavioral STAR Framework Mastery Guide",
+        content: `
+          <h3>1. STAR Round Strategy</h3>
+          <ul>
+            <li><strong>Situation (15%):</strong> Clear, brief context (Project name, constraints, timeline).</li>
+            <li><strong>Task (15%):</strong> Your explicit role and the core challenge.</li>
+            <li><strong>Action (55%):</strong> Concrete steps YOU took (technical analysis, diplomacy, tools chosen).</li>
+            <li><strong>Result (15%):</strong> Quantifiable impact, metrics, and retrospective takeaways.</li>
+          </ul>
+        `
+      }
+    };
+
+    function openDocModal(key) {
+      const doc = docContents[key];
+      if(!doc) return;
+      document.getElementById("modalDocTitle").textContent = doc.title;
+      document.getElementById("modalDocContent").innerHTML = doc.content;
+      document.getElementById("docModal").style.display = "flex";
+    }
+
+    function closeDocModal() {
+      document.getElementById("docModal").style.display = "none";
+    }
+
+    function downloadDoc(filename, key) {
+      const doc = docContents[key];
+      if(!doc) return;
+      // Generate clean printable text file / markdown note
+      const text = `${doc.title}\n=========================================\n\n` + doc.content.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n\n');
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename.replace(".pdf", ".txt");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ── 4. Practice MCQ Quiz Implementation ──
+    const quizData = [
+      {
+        question: "Which of the following database index structures is optimal for executing range queries (e.g. WHERE salary BETWEEN 50000 AND 80000)?",
+        options: [
+          "Hash Index",
+          "B+ Tree Index",
+          "Bitmap Index",
+          "Linear Inverted List"
+        ],
+        correct: 1,
+        explanation: "B+ Trees maintain leaf nodes in a sequentially linked list, enabling rapid linear traversal for range queries. Hash indexes only support exact equality checks O(1)."
+      },
+      {
+        question: "In Operating Systems, Belady's Anomaly demonstrates that increasing the number of page frames allocated to a process can sometimes lead to MORE page faults. Which page replacement algorithm suffers from this?",
+        options: [
+          "Least Recently Used (LRU)",
+          "Optimal Page Replacement (OPT)",
+          "First-In First-Out (FIFO)",
+          "Stack-Based Replacement"
+        ],
+        correct: 2,
+        explanation: "FIFO does not belong to the class of stack algorithms, and can therefore exhibit Belady's Anomaly where allocating more physical frames increases page faults."
+      },
+      {
+        question: "During a TCP connection establishment, what is the exact state of the server after it receives a SYN packet and transmits its SYN-ACK packet?",
+        options: [
+          "SYN-SENT",
+          "SYN-RECEIVED",
+          "ESTABLISHED",
+          "LISTEN"
+        ],
+        correct: 1,
+        explanation: "Upon receiving a client SYN, the server allocates transmission buffers, responds with SYN-ACK, and enters the SYN-RECEIVED state until the final ACK arrives."
+      },
+      {
+        question: "What is the worst-case lookup time complexity of a standard Hash Table when all inserted keys produce identical hash codes (hash collision)?",
+        options: [
+          "O(1)",
+          "O(log n)",
+          "O(n)",
+          "O(n log n)"
+        ],
+        correct: 2,
+        explanation: "If all keys hash to the same bucket and separate chaining is used with a linked list, lookup degrades linearly to O(n)."
+      },
+      {
+        question: "In the STAR behavioral interviewing methodology, which component should occupy the largest proportion (~50-60%) of a candidate's answer?",
+        options: [
+          "Situation (Setting the company context)",
+          "Task (Explaining what needed to be done)",
+          "Action (The specific steps, technical decisions, and ownership you took)",
+          "Result (The final business outcome)"
+        ],
+        correct: 2,
+        explanation: "The Action section is the core of the STAR method where interviewers assess your individual ownership, problem-solving skills, and execution abilities."
+      }
+    ];
+
+    let currentQuizIndex = 0;
+    let quizScore = 0;
+    let quizStarted = false;
+    let answered = false;
+
+    function loadQuizQuestion(idx) {
+      quizStarted = true;
+      answered = false;
+      currentQuizIndex = idx;
+      const q = quizData[idx];
+
+      document.getElementById("quizCounter").textContent = `QUESTION ${idx + 1} OF ${quizData.length}`;
+      document.getElementById("quizQuestionText").textContent = q.question;
+      document.getElementById("quizFeedbackBox").style.display = "none";
+      document.getElementById("btnNextQuiz").style.display = "none";
+
+      const optsContainer = document.getElementById("quizOptionsContainer");
+      optsContainer.innerHTML = q.options.map((opt, i) => `
+        <div class="quiz-opt" onclick="selectQuizOption(${i}, this)">
+          <div style="font-weight:700;font-family:'JetBrains Mono',monospace;">${String.fromCharCode(65 + i)}.</div>
+          <div>${opt}</div>
+        </div>
+      `).join("");
+    }
+
+    function selectQuizOption(choiceIdx, el) {
+      if(answered) return;
+      answered = true;
+
+      const q = quizData[currentQuizIndex];
+      const isCorrect = choiceIdx === q.correct;
+      if(isCorrect) quizScore++;
+
+      document.getElementById("quizScoreBadge").textContent = `SCORE: ${quizScore} / ${currentQuizIndex + 1}`;
+
+      const opts = document.querySelectorAll(".quiz-opt");
+      opts.forEach((optEl, i) => {
+        if(i === q.correct) optEl.classList.add("correct");
+        else if(i === choiceIdx && !isCorrect) optEl.classList.add("wrong");
+      });
+
+      const fb = document.getElementById("quizFeedbackBox");
+      fb.innerHTML = `<strong>${isCorrect ? '✓ Correct Answer!' : '✗ Incorrect Answer'}</strong><br>${q.explanation}`;
+      fb.style.display = "block";
+
+      const nextBtn = document.getElementById("btnNextQuiz");
+      if(currentQuizIndex + 1 < quizData.length) {
+        nextBtn.textContent = "Next Question →";
+      } else {
+        nextBtn.textContent = "Restart Quiz ↺";
+      }
+      nextBtn.style.display = "inline-block";
+    }
+
+    function nextQuizQuestion() {
+      if(currentQuizIndex + 1 < quizData.length) {
+        loadQuizQuestion(currentQuizIndex + 1);
+      } else {
+        quizScore = 0;
+        document.getElementById("quizScoreBadge").textContent = `SCORE: 0 / 0`;
+        loadQuizQuestion(0);
+      }
+    }
+
+    // Initial Flashcard Render
+    renderFlashcard();
   </script>
 </body>
 </html>
