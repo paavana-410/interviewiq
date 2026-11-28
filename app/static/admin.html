@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin & Placement Faculty Portal — InterviewIQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #0F172A;
+      --muted: #64748B;
+      --primary: #2563EB;
+      --primary-hover: #1D4ED8;
+      --success: #059669;
+      --warning: #D97706;
+      --danger: #DC2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      color: #fff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+    .brand-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .nav-link {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-link:hover, .nav-link.active {
+      color: var(--primary);
+    }
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      width: 100%;
+    }
+    .page-header {
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .page-title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0F172A;
+    }
+    .page-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .stat-val {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-top: 0.35rem;
+      color: #0F172A;
+    }
+    .stat-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid #F1F5F9;
+      padding-bottom: 0.85rem;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .badge-tech { background: #EFF6FF; color: #1D4ED8; }
+    .badge-beh { background: #FDF2F8; color: #BE185D; }
+    .badge-clean { background: #ECFDF5; color: #047857; }
+    .badge-flagged { background: #FEF2F2; color: #B91C1C; }
+    
+    .form-group {
+      margin-bottom: 1.1rem;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 0.4rem;
+    }
+    .form-control, .form-select {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.88rem;
+      background: #FFFFFF;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea.form-control {
+      resize: vertical;
+      min-height: 95px;
+      line-height: 1.45;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 0.7rem 1.4rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-success {
+      background: var(--success);
+      color: #fff;
+    }
+    .btn-success:hover { background: #047857; }
+    .btn-outline {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: #F8FAFC; border-color: #CBD5E1; }
+    
+    .table-container {
+      overflow-x: auto;
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    th {
+      background: #F8FAFC;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F8FAFC; }
+    
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #0F172A;
+      color: #fff;
+      padding: 0.9rem 1.5rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      z-index: 100;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header>
+    <a href="/ui/" class="brand">
+      <div class="brand-logo">IQ</div>
+      <div>
+        <div class="brand-title">InterviewIQ</div>
+        <div class="brand-subtitle">Placement & Faculty Admin</div>
+      </div>
+    </a>
+    <nav class="nav-links">
+      <a href="/ui/" class="nav-link">Candidate Interview</a>
+      <a href="/ui/prep.html" class="nav-link">Tutoring & Prep</a>
+      <a href="/ui/admin.html" class="nav-link active">Admin Portal</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Faculty & Placement Coordinator Portal</h1>
+        <p class="page-desc">Upload custom question documents, manage test batches, and export student performance analytics.</p>
+      </div>
+      <div>
+        <a href="/admin/export-csv" class="btn btn-success" download>
+          Download Results (Excel/CSV)
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Question Bank</div>
+        <div class="stat-val" id="statTotalQ">—</div>
+        <div class="stat-sub">Curated & uploaded questions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Technical Track</div>
+        <div class="stat-val" id="statTechQ" style="color:#2563EB;">—</div>
+        <div class="stat-sub">DBMS, OS, CN, DSA</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Behavioral & HR</div>
+        <div class="stat-val" id="statBehQ" style="color:#D946EF;">—</div>
+        <div class="stat-sub">STAR situational questions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Interviews Conducted</div>
+        <div class="stat-val" id="statSessions" style="color:#059669;">—</div>
+        <div class="stat-sub">Completed candidate sessions</div>
+      </div>
+    </div>
+
+    <!-- Two-Column Question Ingestion Cards -->
+    <div class="grid-2">
+
+      <!-- 1. Technical Ingestion Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Technical Question Upload</div>
+          <span class="badge badge-tech">Technical Mode</span>
+        </div>
+        <form id="techUploadForm" onsubmit="handleUpload(event, 'technical')">
+          <div class="form-group">
+            <label class="form-label">Subject / Domain</label>
+            <input type="text" id="techDomain" class="form-control" placeholder="e.g. Operating Systems, DBMS, Machine Learning" value="Core Engineering">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Difficulty</label>
+            <select id="techDiff" class="form-select">
+              <option value="easy">Easy (Fundamentals)</option>
+              <option value="medium" selected>Medium (Application & Depth)</option>
+              <option value="hard">Hard (Advanced Architecture)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Upload Lab Manual / Question Document (TXT, CSV, MD)</label>
+            <input type="file" id="techFile" class="form-control" accept=".txt,.csv,.md,.json">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Or Paste Questions / Manual Content Directly</label>
+            <textarea id="techText" class="form-control" placeholder="Paste numbered questions or lab manual syllabus here...
+1. Explain virtual memory and paging mechanisms.
+2. What are the trade-offs of B-tree vs Hash indexing in DBMS?"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">
+            Ingest Technical Questions into Database
+          </button>
+        </form>
+      </div>
+
+      <!-- 2. Behavioral Ingestion Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Behavioral & HR Question Upload</div>
+          <span class="badge badge-beh">Behavioral Mode</span>
+        </div>
+        <form id="behUploadForm" onsubmit="handleUpload(event, 'behavioral')">
+          <div class="form-group">
+            <label class="form-label">Competency / Category</label>
+            <input type="text" id="behDomain" class="form-control" placeholder="e.g. Conflict Resolution, Leadership, Adaptability" value="Workplace Scenarios">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Difficulty</label>
+            <select id="behDiff" class="form-select">
+              <option value="easy">Easy (Personal Background)</option>
+              <option value="medium" selected>Medium (STAR Scenario)</option>
+              <option value="hard">Hard (Complex Crisis & Ethics)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Upload HR Guide / Question File (TXT, CSV, MD)</label>
+            <input type="file" id="behFile" class="form-control" accept=".txt,.csv,.md,.json">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Or Paste Questions Directly</label>
+            <textarea id="behText" class="form-control" placeholder="Paste behavioral questions here...
+1. Tell me about a time you handled a critical disagreement within your technical team.
+2. Describe a high-pressure deadline and how you prioritized your tasks."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;background:#BE185D;">
+            Ingest Behavioral Questions into Database
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Student Performance Table Card -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Student Interview Performance Roster</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Live records of student attempts, dual-engine scores, and proctoring logs.</div>
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+          <button class="btn btn-outline" onclick="loadStudentData()">Refresh</button>
+          <a href="/admin/export-csv" class="btn btn-success" download>Export to Excel (.csv)</a>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Candidate</th>
+              <th>Track</th>
+              <th>Difficulty</th>
+              <th>Questions</th>
+              <th>Overall Score</th>
+              <th>Content Score</th>
+              <th>Delivery Score</th>
+              <th>Avg WPM</th>
+              <th>Fillers</th>
+              <th>Proctor Status</th>
+              <th>Date & Time</th>
+            </tr>
+          </thead>
+          <tbody id="studentTableBody">
+            <tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);">Loading student performance data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="toast" id="adminToast"></div>
+
+  <script>
+    async function loadStats() {
+      try {
+        const res = await fetch("/admin/stats");
+        if(!res.ok) return;
+        const data = await res.json();
+        document.getElementById("statTotalQ").textContent = data.questions.total;
+        document.getElementById("statTechQ").textContent = data.questions.technical;
+        document.getElementById("statBehQ").textContent = data.questions.behavioral + data.questions.hr;
+        document.getElementById("statSessions").textContent = data.total_sessions;
+      } catch(err) {
+        console.warn("Failed to load admin stats:", err);
+      }
+    }
+
+    async function loadStudentData() {
+      const tbody = document.getElementById("studentTableBody");
+      try {
+        const res = await fetch("/admin/students");
+        if(!res.ok) throw new Error("Could not fetch students");
+        const students = await res.json();
+
+        if(!students.length) {
+          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);">No completed interview sessions recorded yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = students.map(s => `
+          <tr>
+            <td style="font-weight:600;">${esc(s.candidate_name)}</td>
+            <td><span class="badge ${s.track.toLowerCase().includes('tech') ? 'badge-tech' : 'badge-beh'}">${esc(s.track)}</span></td>
+            <td>${esc(s.difficulty)}</td>
+            <td>${s.questions_answered}</td>
+            <td style="font-weight:700;color:${s.overall_score >= 70 ? '#059669' : (s.overall_score >= 50 ? '#D97706' : '#DC2626')};">${s.overall_score}%</td>
+            <td>${s.content_score}%</td>
+            <td>${s.delivery_score}%</td>
+            <td>${s.avg_wpm}</td>
+            <td>${s.total_fillers}</td>
+            <td>
+              <span class="badge ${s.proctor_status === 'Clean' ? 'badge-clean' : 'badge-flagged'}">
+                ${s.proctor_status}
+              </span>
+            </td>
+            <td style="color:var(--muted);font-size:0.8rem;">${s.date}</td>
+          </tr>
+        `).join("");
+      } catch(err) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#DC2626;padding:2rem;">Error loading student records: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function handleUpload(e, category) {
+      e.preventDefault();
+      const isTech = category === "technical";
+      const domain = document.getElementById(isTech ? "techDomain" : "behDomain").value;
+      const diff = document.getElementById(isTech ? "techDiff" : "behDiff").value;
+      const fileInput = document.getElementById(isTech ? "techFile" : "behFile");
+      const textVal = document.getElementById(isTech ? "techText" : "behText").value;
+
+      const fd = new FormData();
+      fd.append("category", category);
+      fd.append("domain", domain);
+      fd.append("difficulty", diff);
+      fd.append("text_content", textVal);
+      if(fileInput.files.length > 0) {
+        fd.append("file", fileInput.files[0]);
+      }
+
+      showToast(`Ingesting ${category} questions...`);
+
+      try {
+        const res = await fetch("/admin/upload-questions", {
+          method: "POST",
+          body: fd
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.detail || "Upload failed");
+
+        showToast(data.message || "Questions successfully saved to database!");
+        if(fileInput) fileInput.value = "";
+        document.getElementById(isTech ? "techText" : "behText").value = "";
+        loadStats();
+      } catch(err) {
+        showToast(`Error: ${err.message}`);
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("adminToast");
+      t.textContent = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 4000);
+    }
+
+    function esc(s) {
+      if(!s) return "";
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Initial Load
+    loadStats();
+    loadStudentData();
+  </script>
+</body>
+</html>

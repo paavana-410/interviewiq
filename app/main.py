@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import annotations, interview, responses, sessions
+from app.api.routes import admin, annotations, interview, responses, sessions
 from app.config import get_settings
 
 
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(responses.router)
     app.include_router(annotations.router)
     app.include_router(interview.router)
+    app.include_router(admin.router)
 
     # Serve plain-HTML UI from app/static
     static_dir = Path(__file__).parent / "static"
